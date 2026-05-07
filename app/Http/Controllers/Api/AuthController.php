@@ -40,15 +40,14 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required',
+            'email' => 'required|email',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (! $user) {
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'email' => ['No account found with this email address.'],
             ]);
         }
 
