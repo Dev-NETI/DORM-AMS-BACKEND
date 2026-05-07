@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\HasModifiedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StockReceival extends Model
 {
@@ -46,5 +47,10 @@ class StockReceival extends Model
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ReceivalDocument::class);
     }
 }

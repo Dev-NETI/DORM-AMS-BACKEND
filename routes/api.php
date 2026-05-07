@@ -38,12 +38,23 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Reference / lookup resources ─────────────────────────────────────────
     Route::apiResource('departments', DepartmentController::class);
+
+    // Custom import/template routes MUST be declared before apiResource so that
+    // Laravel does not swallow "import" / "template" as a {category} parameter.
+    Route::post('categories/import',  [CategoryController::class, 'import']);
+    Route::get('categories/template', [CategoryController::class, 'template']);
     Route::apiResource('categories',  CategoryController::class);
-    Route::apiResource('units',       UnitController::class);
+
+    Route::apiResource('units', UnitController::class);
+
+    Route::post('suppliers/import',   [SupplierController::class, 'import']);
+    Route::get('suppliers/template',  [SupplierController::class, 'template']);
     Route::apiResource('suppliers',   SupplierController::class);
 
     // ── Item definitions ──────────────────────────────────────────────────────
-    Route::apiResource('items', ItemController::class);
+    Route::post('items/import',       [ItemController::class, 'import']);
+    Route::get('items/template',      [ItemController::class, 'template']);
+    Route::apiResource('items',       ItemController::class);
 
     // ── People ────────────────────────────────────────────────────────────────
     Route::apiResource('users',     UserController::class);
@@ -51,9 +62,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Fixed-asset management ────────────────────────────────────────────────
     // Custom actions MUST be declared before apiResource to avoid {itemAsset} swallowing them
-    Route::post('item-assets/{itemAsset}/assign',    [ItemAssetController::class, 'assign']);
-    Route::post('item-assets/{itemAsset}/return',    [ItemAssetController::class, 'returnAsset']);
-    Route::post('item-assets/{itemAsset}/upload-dr', [ItemAssetController::class, 'uploadDeliveryReceipt']);
+    Route::post('item-assets/import',   [ItemAssetController::class, 'import']);
+    Route::get('item-assets/template',  [ItemAssetController::class, 'template']);
+    Route::post('item-assets/{itemAsset}/assign',                 [ItemAssetController::class, 'assign']);
+    Route::post('item-assets/{itemAsset}/return',                 [ItemAssetController::class, 'returnAsset']);
+    Route::post('item-assets/{itemAsset}/upload-dr',              [ItemAssetController::class, 'uploadDeliveryReceipt']);
+    Route::post('item-assets/{itemAsset}/documents',              [ItemAssetController::class, 'uploadDocument']);
+    Route::delete('item-assets/{itemAsset}/documents/{document}', [ItemAssetController::class, 'deleteDocument']);
     Route::apiResource('item-assets', ItemAssetController::class);
 
     // Asset assignment history (read + update notes/status + delete closed records)
@@ -62,11 +77,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Consumable stock management ───────────────────────────────────────────
     // Stock levels per item per department
-    Route::get('inventory-stocks',               [InventoryStockController::class, 'index']);
+    Route::get('inventory-stocks',                    [InventoryStockController::class, 'index']);
     Route::get('inventory-stocks/{item}/{department}', [InventoryStockController::class, 'show']);
-    Route::post('inventory-stocks/adjust',       [InventoryStockController::class, 'adjust']);
+    Route::post('inventory-stocks/adjust',            [InventoryStockController::class, 'adjust']);
 
     // Receive new consumable stock (creates StockReceival + increments InventoryStock)
+    Route::post('stock-receivals/import',                               [StockReceivalController::class, 'import']);
+    Route::get('stock-receivals/template',                              [StockReceivalController::class, 'template']);
+    Route::post('stock-receivals/{stockReceival}/documents',            [StockReceivalController::class, 'uploadDocument']);
     Route::apiResource('stock-receivals', StockReceivalController::class)
         ->only(['index', 'show', 'store']);
 

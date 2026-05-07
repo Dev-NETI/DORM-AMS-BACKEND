@@ -51,4 +51,9 @@ class ItemAsset extends Model
     {
         return $this->hasOne(AssetAssignment::class, 'asset_id')->where('status', 'active');
     }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(AssetDocument::class);
+    }
 }

@@ -23,6 +23,7 @@ class CategorySeeder extends Seeder
             ['name' => 'Switches',            'description' => 'Network switches',                       'dept' => 'NOD'],
             ['name' => 'Routers',             'description' => 'Network routers',                        'dept' => 'NOD'],
             ['name' => 'UPS / Power',         'description' => 'Uninterruptible power supplies',         'dept' => 'NOD'],
+            ['name' => 'Access Points',       'description' => 'Wireless access points and repeaters',   'dept' => 'NOD'],
             // BOD — Clothing
             ['name' => 'T-Shirts',            'description' => 'Staff t-shirts',                         'dept' => 'BOD'],
             ['name' => 'Polo Shirts',         'description' => 'Polo shirts',                            'dept' => 'BOD'],
