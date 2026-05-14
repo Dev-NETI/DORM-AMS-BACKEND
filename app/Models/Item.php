@@ -6,6 +6,7 @@ use App\Traits\HasModifiedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Item extends Model
 {
@@ -63,6 +64,12 @@ class Item extends Model
     public function stockReceivials(): HasMany
     {
         return $this->hasMany(StockReceival::class);
+    }
+
+    /** Room furniture stock record (only exists for furniture items) */
+    public function roomFurnitureStock(): HasOne
+    {
+        return $this->hasOne(RoomFurnitureStock::class);
     }
 
     public function isFixedAsset(): bool

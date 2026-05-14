@@ -9,6 +9,13 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\InventoryStockController;
 use App\Http\Controllers\Api\ItemAssetController;
 use App\Http\Controllers\Api\ItemController;
+use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\RoomFurnitureItemController;
+use App\Http\Controllers\Api\RoomFurnitureItemLogController;
+use App\Http\Controllers\Api\RoomFurnitureLogController;
+use App\Http\Controllers\Api\RoomInventoryController;
+use App\Http\Controllers\Api\RoomLocationController;
+use App\Http\Controllers\Api\RoomPurchaseController;
 use App\Http\Controllers\Api\StockIssuanceController;
 use App\Http\Controllers\Api\StockReceivalController;
 use App\Http\Controllers\Api\SupplierController;
@@ -91,4 +98,27 @@ Route::middleware('auth:sanctum')->group(function () {
     // Issue consumable stock to person/department (creates StockIssuance + decrements InventoryStock)
     Route::apiResource('stock-issuances', StockIssuanceController::class)
         ->only(['index', 'show', 'store']);
+
+    // ── Room Furniture Inventory ──────────────────────────────────────────────
+    Route::apiResource('room-locations', RoomLocationController::class);
+    Route::apiResource('rooms',          RoomController::class);
+
+    // Room inventory matrix (quantity per room × item)
+    Route::get('room-inventory/matrix',                    [RoomInventoryController::class, 'matrix']);
+    Route::put('room-inventory/cell/{roomId}/{itemId}',    [RoomInventoryController::class, 'updateCell']);
+    Route::put('room-inventory/room/{room}',               [RoomInventoryController::class, 'updateRoom']);
+
+    // Furniture item management (CRUD + stock)
+    Route::apiResource('room-furniture-items', RoomFurnitureItemController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['room-furniture-items' => 'roomFurnitureItem']);
+
+    // Purchase / receive stock records
+    Route::post('room-purchases/{roomPurchase}/documents', [RoomPurchaseController::class, 'storeDocuments']);
+    Route::apiResource('room-purchases', RoomPurchaseController::class)->only(['index', 'store', 'destroy']);
+
+    // Movement history log
+    Route::get('room-furniture-logs',      [RoomFurnitureLogController::class,     'index']);
+    // Furniture item lifecycle log (created / deleted)
+    Route::get('room-furniture-item-logs', [RoomFurnitureItemLogController::class, 'index']);
 });

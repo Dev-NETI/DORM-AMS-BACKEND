@@ -22,49 +22,12 @@ class DepartmentUserSeeder extends Seeder
             'inventory-stocks',
             'stock-receivals',
             'stock-issuances',
+            'units',
+            'room-assets',
+            'room-locations'
         ]);
 
         $users = [
-            [
-                'name'          => 'NOD Administrator',
-                'email'         => 'noc@neti.com.ph',
-                'password'      => Hash::make('password'),
-                'user_type'     => 'employee',
-                'department_id' => $dept('NOD'),
-                'permissions'   => $defaultPermissions,
-            ],
-            [
-                'name'          => 'BOD Administrator',
-                'email'         => 'bod@neti.com.ph',
-                'password'      => Hash::make('password'),
-                'user_type'     => 'employee',
-                'department_id' => $dept('BOD'),
-                'permissions'   => $defaultPermissions,
-            ],
-            [
-                'name'          => 'PRPD Administrator',
-                'email'         => 'prpd@neti.com.ph',
-                'password'      => Hash::make('password'),
-                'user_type'     => 'employee',
-                'department_id' => $dept('PRPD'),
-                'permissions'   => $defaultPermissions,
-            ],
-            [
-                'name'          => 'HRAD Administrator',
-                'email'         => 'hrad@neti.com.ph',
-                'password'      => Hash::make('password'),
-                'user_type'     => 'employee',
-                'department_id' => $dept('HRAD'),
-                'permissions'   => $defaultPermissions,
-            ],
-            [
-                'name'          => 'GOD Administrator',
-                'email'         => 'god@neti.com.ph',
-                'password'      => Hash::make('password'),
-                'user_type'     => 'employee',
-                'department_id' => $dept('GOD'),
-                'permissions'   => $defaultPermissions,
-            ],
             [
                 'name'          => 'DOD Administrator',
                 'email'         => 'dod@neti.com.ph',
@@ -74,13 +37,14 @@ class DepartmentUserSeeder extends Seeder
                 'permissions'   => $defaultPermissions,
             ],
             [
-                'name'          => 'Finance Administrator',
-                'email'         => 'fin@neti.com.ph',
+                'name'          => 'Sherwin Roxas',
+                'email'         => 'sherwin.roxas@neti.com.ph',
                 'password'      => Hash::make('password'),
                 'user_type'     => 'employee',
-                'department_id' => $dept('FIN'),
+                'department_id' => $dept('DOD'),
                 'permissions'   => $defaultPermissions,
             ],
+
         ];
 
         foreach ($users as $userData) {
