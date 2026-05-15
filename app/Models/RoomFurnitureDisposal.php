@@ -2,32 +2,18 @@
 
 namespace App\Models;
 
-use App\Traits\HasModifiedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class RoomFurniture extends Model
+class RoomFurnitureDisposal extends Model
 {
-    use HasModifiedBy;
-
-    protected $table = 'room_furniture';
-
     protected $fillable = [
-        'room_id',
         'item_id',
         'sub_item_id',
         'quantity',
         'notes',
+        'tagged_by',
     ];
-
-    protected $casts = [
-        'quantity' => 'integer',
-    ];
-
-    public function room(): BelongsTo
-    {
-        return $this->belongsTo(Room::class);
-    }
 
     public function item(): BelongsTo
     {
@@ -37,5 +23,10 @@ class RoomFurniture extends Model
     public function subItem(): BelongsTo
     {
         return $this->belongsTo(RoomFurnitureItemVariant::class, 'sub_item_id');
+    }
+
+    public function tagger(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'tagged_by');
     }
 }

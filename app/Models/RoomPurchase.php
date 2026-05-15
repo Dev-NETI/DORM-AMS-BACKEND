@@ -11,6 +11,7 @@ class RoomPurchase extends Model
 
     protected $fillable = [
         'item_id',
+        'sub_item_id',
         'room_id',
         'quantity',
         'unit_cost',
@@ -35,6 +36,11 @@ class RoomPurchase extends Model
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
+    }
+
+    public function subItem(): BelongsTo
+    {
+        return $this->belongsTo(RoomFurnitureItemVariant::class, 'sub_item_id');
     }
 
     public function supplier(): BelongsTo

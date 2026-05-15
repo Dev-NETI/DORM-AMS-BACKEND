@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\RoomFurnitureItemController;
 use App\Http\Controllers\Api\RoomFurnitureItemLogController;
+use App\Http\Controllers\Api\RoomFurnitureDisposalController;
+use App\Http\Controllers\Api\RoomFurnitureItemVariantController;
 use App\Http\Controllers\Api\RoomFurnitureLogController;
 use App\Http\Controllers\Api\RoomInventoryController;
 use App\Http\Controllers\Api\RoomLocationController;
@@ -106,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Room inventory matrix (quantity per room × item)
     Route::get('room-inventory/matrix',                    [RoomInventoryController::class, 'matrix']);
     Route::put('room-inventory/cell/{roomId}/{itemId}',    [RoomInventoryController::class, 'updateCell']);
+    Route::put('room-inventory/cell/{roomId}/{itemId}/{subItemId}', [RoomInventoryController::class, 'updateVariantCell']);
     Route::put('room-inventory/room/{room}',               [RoomInventoryController::class, 'updateRoom']);
 
     // Furniture item management (CRUD + stock)
@@ -121,4 +124,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('room-furniture-logs',      [RoomFurnitureLogController::class,     'index']);
     // Furniture item lifecycle log (created / deleted)
     Route::get('room-furniture-item-logs', [RoomFurnitureItemLogController::class, 'index']);
+    Route::apiResource('room-furniture-item-variants', RoomFurnitureItemVariantController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['room-furniture-item-variants' => 'roomFurnitureItemVariant']);
+
+    // Disposal tracking
+    Route::apiResource('room-furniture-disposals', RoomFurnitureDisposalController::class)
+        ->only(['index', 'store', 'destroy'])
+        ->parameters(['room-furniture-disposals' => 'roomFurnitureDisposal']);
 });

@@ -44,22 +44,26 @@ class RoomPurchaseController extends Controller
     {
         $validated = $request->validate([
             'item_id'       => 'required|exists:items,id',
+            'sub_item_id'   => 'nullable|exists:room_furniture_item_variants,id',
             'quantity'      => 'required|integer|min:1',
             'room_id'       => 'nullable|exists:rooms,id',
             'purchase_date' => 'nullable|date',
             'notes'         => 'nullable|string',
         ]);
 
-        $purchase = DB::transaction(function () use ($validated, $request) {
-            // Ensure a stock record exists and increment it
+        $subItemId = $validated['sub_item_id'] ?? null;
+
+        $purchase = DB::transaction(function () use ($validated, $request, $subItemId) {
+            // Increment the correct stock record (per-variant or base)
             $stock = RoomFurnitureStock::firstOrCreate(
-                ['item_id' => $validated['item_id']],
+                ['item_id' => $validated['item_id'], 'sub_item_id' => $subItemId],
                 ['total_quantity' => 0]
             );
             $stock->increment('total_quantity', $validated['quantity']);
 
             $purchase = RoomPurchase::create([
                 'item_id'       => $validated['item_id'],
+                'sub_item_id'   => $subItemId,
                 'room_id'       => $validated['room_id'] ?? null,
                 'quantity'      => $validated['quantity'],
                 'purchase_date' => $validated['purchase_date'] ?? null,
@@ -70,7 +74,7 @@ class RoomPurchaseController extends Controller
             // If a room is specified, also assign quantity to that room
             if (! empty($validated['room_id'])) {
                 $furniture = RoomFurniture::firstOrCreate(
-                    ['room_id' => $validated['room_id'], 'item_id' => $validated['item_id']],
+                    ['room_id' => $validated['room_id'], 'item_id' => $validated['item_id'], 'sub_item_id' => $subItemId],
                     ['quantity' => 0]
                 );
                 $qtyBefore = $furniture->quantity;
@@ -91,14 +95,15 @@ class RoomPurchaseController extends Controller
             return $purchase;
         });
 
-        $purchase->load(['item', 'room.location', 'purchasedBy']);
+        $purchase->load(['item', 'room.location', 'purchasedBy', 'subItem']);
 
+        $variantNote = $subItemId ? " [{$purchase->subItem?->name}]" : '';
         RoomFurnitureItemLog::record(
             itemName:   $purchase->item->name,
             actionType: 'purchased',
             itemId:     $purchase->item_id,
             userId:     $request->user()->id,
-            notes:      "Received {$validated['quantity']} unit(s)" . ($validated['notes'] ? ": {$validated['notes']}" : ''),
+            notes:      "Received {$validated['quantity']} unit(s){$variantNote}" . (($validated['notes'] ?? null) ? ": {$validated['notes']}" : ''),
             purchaseId: $purchase->id,
         );
 

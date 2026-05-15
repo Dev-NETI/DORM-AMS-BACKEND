@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\Room;
 use App\Models\RoomFurniture;
+use App\Models\RoomFurnitureDisposal;
+use App\Models\RoomFurnitureItemVariant;
 use App\Models\RoomFurnitureLog;
 use App\Models\RoomFurnitureStock;
 use App\Models\RoomLocation;
@@ -20,57 +22,121 @@ class RoomInventoryController extends Controller
 
     /**
      * Return the full matrix.
-     * Only items that have a room_furniture_stock record are included (registered furniture items).
-     * Each item also carries total_quantity, deployed, and available counts.
+     * Items with variants return variant-level cell data.
+     * Items without variants return simple {qty} cell data.
      */
     public function matrix(): JsonResponse
     {
-        // Only furniture items that are registered in room_furniture_stock
+        // Only furniture items registered in room_furniture_stock
         $items = Item::whereHas('roomFurnitureStock')
-            ->with('roomFurnitureStock')
+            ->with(['roomFurnitureStock', 'roomFurnitureVariants'])
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        // Preload deployed quantities per item in one query
+        // Preload deployed quantities per item
         $itemIds  = $items->pluck('id');
         $deployed = RoomFurniture::whereIn('item_id', $itemIds)
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
-        // Append stock info to each item
-        $itemsData = $items->map(function (Item $item) use ($deployed) {
-            $dep   = (int) ($deployed[$item->id] ?? 0);
-            $total = $item->roomFurnitureStock?->total_quantity ?? 0;
+        // For variant items, total stock = sum of per-variant stock records
+        $variantStockTotals = RoomFurnitureStock::whereIn('item_id', $itemIds)
+            ->whereNotNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(total_quantity) as total')
+            ->pluck('total', 'item_id');
+
+        // Disposal quantities per item (base and variant-sum)
+        $disposalBase = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+            ->whereNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(quantity) as total')
+            ->pluck('total', 'item_id');
+
+        $disposalVariant = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+            ->whereNotNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(quantity) as total')
+            ->pluck('total', 'item_id');
+
+        // Build items data with has_variants flag and variant list
+        $itemsData = $items->map(function (Item $item) use ($deployed, $variantStockTotals, $disposalBase, $disposalVariant) {
+            $dep      = (int) ($deployed[$item->id] ?? 0);
+            $variants = $item->roomFurnitureVariants->map(fn ($v) => [
+                'id'   => $v->id,
+                'name' => $v->name,
+            ])->values();
+
+            $hasVariants = $variants->isNotEmpty();
+            $rawTotal = $hasVariants
+                ? (int) ($variantStockTotals[$item->id] ?? 0)
+                : ($item->roomFurnitureStock?->total_quantity ?? 0);
+
+            $forDisposal = $hasVariants
+                ? (int) ($disposalVariant[$item->id] ?? 0)
+                : (int) ($disposalBase[$item->id] ?? 0);
+
+            $total = max(0, $rawTotal - $forDisposal);
+
             return [
                 'id'             => $item->id,
                 'name'           => $item->name,
                 'total_quantity' => $total,
                 'deployed'       => $dep,
+                'for_disposal'   => $forDisposal,
                 'available'      => max(0, $total - $dep),
+                'has_variants'   => $hasVariants,
+                'variants'       => $variants,
             ];
         });
 
-        // All locations with rooms and their furniture
+        // Collect item IDs that have variants
+        $variantItemIds = $itemsData->where('has_variants', true)->pluck('id')->all();
+
+        // All locations with rooms + their furniture (eager-load subItem relation)
         $locations = RoomLocation::with([
-            'rooms' => fn ($q) => $q->orderBy('room_number'),
+            'rooms'           => fn ($q) => $q->orderBy('room_number'),
             'rooms.furniture',
+            'rooms.furniture.subItem',
         ])->orderBy('name')->get();
 
         $grandTotals = [];
 
-        $locationsData = $locations->map(function (RoomLocation $loc) use (&$grandTotals) {
+        $locationsData = $locations->map(function (RoomLocation $loc) use (&$grandTotals, $variantItemIds) {
             $subtotals = [];
 
-            $roomsData = $loc->rooms->map(function (Room $room) use (&$subtotals) {
+            $roomsData = $loc->rooms->map(function (Room $room) use (&$subtotals, $variantItemIds) {
+                $byItem     = $room->furniture->groupBy('item_id');
                 $quantities = [];
 
-                foreach ($room->furniture as $rf) {
-                    $quantities[$rf->item_id] = [
-                        'qty'   => $rf->quantity,
-                        'model' => $rf->model,
-                    ];
-                    $subtotals[$rf->item_id]  = ($subtotals[$rf->item_id] ?? 0) + $rf->quantity;
+                foreach ($byItem as $itemId => $records) {
+                    $itemId = (int) $itemId;
+
+                    if (in_array($itemId, $variantItemIds, true)) {
+                        // Variant item: list of assigned sub-items with qty
+                        $variants = $records->map(fn ($rf) => [
+                            'sub_item_id' => $rf->sub_item_id,
+                            'name'        => $rf->subItem?->name ?? '?',
+                            'qty'         => $rf->quantity,
+                        ])->values();
+
+                        $total = $records->sum('quantity');
+                        $quantities[$itemId] = [
+                            'type'     => 'variant',
+                            'variants' => $variants,
+                            'total'    => $total,
+                        ];
+                        $subtotals[$itemId] = ($subtotals[$itemId] ?? 0) + $total;
+                    } else {
+                        // Simple item: single qty value
+                        $qty = $records->first()->quantity;
+                        $quantities[$itemId] = [
+                            'type' => 'simple',
+                            'qty'  => $qty,
+                        ];
+                        $subtotals[$itemId] = ($subtotals[$itemId] ?? 0) + $qty;
+                    }
                 }
 
                 return [
@@ -104,32 +170,35 @@ class RoomInventoryController extends Controller
     }
 
     /**
-     * Update a single quantity cell: room × item.
+     * Update a simple (non-variant) cell: room × item.
      * PUT /api/room-inventory/cell/{roomId}/{itemId}
      */
     public function updateCell(Request $request, int $roomId, int $itemId): JsonResponse
     {
         $validated = $request->validate([
             'quantity' => 'required|integer|min:0',
-            'model'    => 'nullable|string|max:255',
             'notes'    => 'nullable|string',
         ]);
 
         Room::findOrFail($roomId);
         Item::findOrFail($itemId);
 
-        $existing  = RoomFurniture::where('room_id', $roomId)->where('item_id', $itemId)->first();
+        $existing  = RoomFurniture::where('room_id', $roomId)
+            ->where('item_id', $itemId)
+            ->whereNull('sub_item_id')
+            ->first();
         $qtyBefore = $existing?->quantity ?? 0;
         $qtyAfter  = $validated['quantity'];
 
-        // Stock validation
         if ($qtyAfter > 0) {
-            $stock = RoomFurnitureStock::where('item_id', $itemId)->first();
+            $stock = RoomFurnitureStock::where('item_id', $itemId)->whereNull('sub_item_id')->first();
             if ($stock) {
+                $forDisposal     = (int) RoomFurnitureDisposal::where('item_id', $itemId)->whereNull('sub_item_id')->sum('quantity');
                 $currentDeployed = (int) RoomFurniture::where('item_id', $itemId)->sum('quantity');
                 $newDeployed     = $currentDeployed - $qtyBefore + $qtyAfter;
-                if ($newDeployed > $stock->total_quantity) {
-                    $available = max(0, $stock->total_quantity - $currentDeployed + $qtyBefore);
+                $netTotal        = max(0, $stock->total_quantity - $forDisposal);
+                if ($newDeployed > $netTotal) {
+                    $available = max(0, $netTotal - $currentDeployed + $qtyBefore);
                     return $this->error(
                         "Insufficient stock. Only {$available} unit(s) available for this item.",
                         422
@@ -139,15 +208,14 @@ class RoomInventoryController extends Controller
         }
 
         if ($qtyAfter === 0) {
-            RoomFurniture::where('room_id', $roomId)->where('item_id', $itemId)->delete();
+            RoomFurniture::where('room_id', $roomId)
+                ->where('item_id', $itemId)
+                ->whereNull('sub_item_id')
+                ->delete();
         } else {
             RoomFurniture::updateOrCreate(
-                ['room_id' => $roomId, 'item_id' => $itemId],
-                [
-                    'quantity' => $qtyAfter,
-                    'model'    => $validated['model'] ?? null,
-                    'notes'    => $validated['notes'] ?? null,
-                ]
+                ['room_id' => $roomId, 'item_id' => $itemId, 'sub_item_id' => null],
+                ['quantity' => $qtyAfter, 'notes' => $validated['notes'] ?? null]
             );
         }
 
@@ -167,7 +235,77 @@ class RoomInventoryController extends Controller
     }
 
     /**
-     * Bulk update all quantities for a single room.
+     * Update a variant cell: room × item × sub-item.
+     * PUT /api/room-inventory/cell/{roomId}/{itemId}/{subItemId}
+     */
+    public function updateVariantCell(Request $request, int $roomId, int $itemId, int $subItemId): JsonResponse
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:0',
+            'notes'    => 'nullable|string',
+        ]);
+
+        Room::findOrFail($roomId);
+        $variant = RoomFurnitureItemVariant::findOrFail($subItemId);
+
+        $existing  = RoomFurniture::where('room_id', $roomId)
+            ->where('item_id', $itemId)
+            ->where('sub_item_id', $subItemId)
+            ->first();
+        $qtyBefore = $existing?->quantity ?? 0;
+        $qtyAfter  = $validated['quantity'];
+
+        if ($qtyAfter > 0) {
+            // Validate against this specific variant's stock
+            $stock = RoomFurnitureStock::where('item_id', $itemId)
+                ->where('sub_item_id', $subItemId)
+                ->first();
+            if ($stock) {
+                $forDisposal     = (int) RoomFurnitureDisposal::where('item_id', $itemId)->where('sub_item_id', $subItemId)->sum('quantity');
+                $currentDeployed = (int) RoomFurniture::where('item_id', $itemId)
+                    ->where('sub_item_id', $subItemId)
+                    ->sum('quantity');
+                $newDeployed = $currentDeployed - $qtyBefore + $qtyAfter;
+                $netTotal    = max(0, $stock->total_quantity - $forDisposal);
+                if ($newDeployed > $netTotal) {
+                    $available = max(0, $netTotal - $currentDeployed + $qtyBefore);
+                    return $this->error(
+                        "Insufficient stock. Only {$available} unit(s) available for \"{$variant->name}\".",
+                        422
+                    );
+                }
+            }
+        }
+
+        if ($qtyAfter === 0) {
+            RoomFurniture::where('room_id', $roomId)
+                ->where('item_id', $itemId)
+                ->where('sub_item_id', $subItemId)
+                ->delete();
+        } else {
+            RoomFurniture::updateOrCreate(
+                ['room_id' => $roomId, 'item_id' => $itemId, 'sub_item_id' => $subItemId],
+                ['quantity' => $qtyAfter, 'notes' => $validated['notes'] ?? null]
+            );
+        }
+
+        if ($qtyBefore !== $qtyAfter) {
+            RoomFurnitureLog::record(
+                roomId:     $roomId,
+                itemId:     $itemId,
+                actionType: 'adjustment',
+                qtyBefore:  $qtyBefore,
+                qtyAfter:   $qtyAfter,
+                userId:     $request->user()?->id,
+                notes:      $variant->name . (($validated['notes'] ?? null) ? ': ' . $validated['notes'] : ''),
+            );
+        }
+
+        return $this->success(null, 'Quantity updated');
+    }
+
+    /**
+     * Bulk update all quantities for a single room (non-variant items only).
      * PUT /api/room-inventory/room/{room}
      */
     public function updateRoom(Request $request, Room $room): JsonResponse
@@ -177,16 +315,21 @@ class RoomInventoryController extends Controller
             'quantities.*' => 'integer|min:0',
         ]);
 
-        // Pre-validate all stock constraints before writing anything
         $itemIds      = array_keys($validated['quantities']);
-        $stocks       = RoomFurnitureStock::whereIn('item_id', $itemIds)->get()->keyBy('item_id');
+        $stocks       = RoomFurnitureStock::whereIn('item_id', $itemIds)->whereNull('sub_item_id')->get()->keyBy('item_id');
         $deployedSums = RoomFurniture::whereIn('item_id', $itemIds)
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(quantity) as total')
+            ->pluck('total', 'item_id');
+        $disposalSums = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+            ->whereNull('sub_item_id')
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
         $currentRoom = RoomFurniture::where('room_id', $room->id)
             ->whereIn('item_id', $itemIds)
+            ->whereNull('sub_item_id')
             ->get()
             ->keyBy('item_id');
 
@@ -197,10 +340,12 @@ class RoomInventoryController extends Controller
 
             if ($stock && $qtyAfter > 0) {
                 $current     = (int) ($currentRoom[$itemId]?->quantity ?? 0);
+                $forDisposal = (int) ($disposalSums[$itemId] ?? 0);
+                $netTotal    = max(0, $stock->total_quantity - $forDisposal);
                 $newDeployed = (int) ($deployedSums[$itemId] ?? 0) - $current + $qtyAfter;
-                if ($newDeployed > $stock->total_quantity) {
+                if ($newDeployed > $netTotal) {
                     $item = Item::find($itemId);
-                    $available = max(0, $stock->total_quantity - (int) ($deployedSums[$itemId] ?? 0) + $current);
+                    $available = max(0, $netTotal - (int) ($deployedSums[$itemId] ?? 0) + $current);
                     return $this->error(
                         "Insufficient stock for \"{$item?->name}\". Only {$available} unit(s) available.",
                         422
@@ -218,10 +363,13 @@ class RoomInventoryController extends Controller
                 $qtyAfter  = max(0, (int) $qty);
 
                 if ($qtyAfter <= 0) {
-                    RoomFurniture::where('room_id', $room->id)->where('item_id', $itemId)->delete();
+                    RoomFurniture::where('room_id', $room->id)
+                        ->where('item_id', $itemId)
+                        ->whereNull('sub_item_id')
+                        ->delete();
                 } else {
                     RoomFurniture::updateOrCreate(
-                        ['room_id' => $room->id, 'item_id' => $itemId],
+                        ['room_id' => $room->id, 'item_id' => $itemId, 'sub_item_id' => null],
                         ['quantity' => $qtyAfter]
                     );
                 }

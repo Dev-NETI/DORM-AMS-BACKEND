@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\RoomFurniture;
+use App\Models\RoomFurnitureDisposal;
 use App\Models\RoomFurnitureItemLog;
 use App\Models\RoomFurnitureStock;
 use App\Models\Unit;
@@ -24,28 +25,62 @@ class RoomFurnitureItemController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Only base (non-variant) stock records — one per item
         $stocks = RoomFurnitureStock::with(['item.category', 'item.unit'])
+            ->whereNull('sub_item_id')
             ->orderBy('id')
             ->get();
 
-        // Preload deployed quantities in a single query
-        $itemIds   = $stocks->pluck('item_id');
-        $deployed  = RoomFurniture::whereIn('item_id', $itemIds)
+        $itemIds = $stocks->pluck('item_id');
+
+        // For items that have per-variant stocks, sum those instead of the base record
+        $variantTotals = RoomFurnitureStock::whereIn('item_id', $itemIds)
+            ->whereNotNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(total_quantity) as total')
+            ->pluck('total', 'item_id');
+
+        $deployed = RoomFurniture::whereIn('item_id', $itemIds)
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
-        $result = $stocks->map(function (RoomFurnitureStock $stock) use ($deployed) {
-            $dep = (int) ($deployed[$stock->item_id] ?? 0);
+        // For disposal: sum per-item disposal quantities (base items use whereNull, variant items sum all)
+        $disposalBase = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+            ->whereNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(quantity) as total')
+            ->pluck('total', 'item_id');
+
+        $disposalVariant = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+            ->whereNotNull('sub_item_id')
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(quantity) as total')
+            ->pluck('total', 'item_id');
+
+        $result = $stocks->map(function (RoomFurnitureStock $stock) use ($deployed, $variantTotals, $disposalBase, $disposalVariant) {
+            $dep          = (int) ($deployed[$stock->item_id] ?? 0);
+            $hasVariants  = isset($variantTotals[$stock->item_id]);
+            $total        = $hasVariants
+                ? (int) $variantTotals[$stock->item_id]
+                : $stock->total_quantity;
+            $forDisposal  = $hasVariants
+                ? (int) ($disposalVariant[$stock->item_id] ?? 0)
+                : (int) ($disposalBase[$stock->item_id] ?? 0);
+
+            $netTotal = max(0, $total - $forDisposal);
+
             return [
-                'id'               => $stock->id,
-                'item_id'          => $stock->item_id,
-                'item'             => $stock->item,
-                'total_quantity'   => $stock->total_quantity,
-                'deployed'         => $dep,
-                'available'        => max(0, $stock->total_quantity - $dep),
-                'notes'            => $stock->notes,
-                'updated_at'       => $stock->updated_at,
+                'id'             => $stock->id,
+                'item_id'        => $stock->item_id,
+                'item'           => $stock->item,
+                'total_quantity' => $netTotal,
+                'deployed'       => $dep,
+                'for_disposal'   => $forDisposal,
+                'available'      => max(0, $netTotal - $dep),
+                'has_variants'   => $hasVariants,
+                'notes'          => $stock->notes,
+                'updated_at'     => $stock->updated_at,
             ];
         });
 

@@ -66,10 +66,16 @@ class Item extends Model
         return $this->hasMany(StockReceival::class);
     }
 
-    /** Room furniture stock record (only exists for furniture items) */
+    /** Room furniture stock record (base/null-variant record only) */
     public function roomFurnitureStock(): HasOne
     {
-        return $this->hasOne(RoomFurnitureStock::class);
+        return $this->hasOne(RoomFurnitureStock::class)->whereNull('sub_item_id');
+    }
+
+    /** Sub-items (brand/model variants) for this furniture item */
+    public function roomFurnitureVariants(): HasMany
+    {
+        return $this->hasMany(RoomFurnitureItemVariant::class)->orderBy('name');
     }
 
     public function isFixedAsset(): bool

@@ -11,6 +11,7 @@ class RoomFurnitureStock extends Model
 
     protected $fillable = [
         'item_id',
+        'sub_item_id',
         'total_quantity',
         'notes',
     ];
@@ -22,6 +23,11 @@ class RoomFurnitureStock extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    public function subItem(): BelongsTo
+    {
+        return $this->belongsTo(RoomFurnitureItemVariant::class, 'sub_item_id');
     }
 
     /**

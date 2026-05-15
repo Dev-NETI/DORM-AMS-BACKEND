@@ -104,7 +104,7 @@ class RoomInventorySeeder extends Seeder
         14 => 'DMT',
         15 => 'WCS',
         16 => 'FRG',
-        17 => 'ACU',
+        // ACU (col 17) excluded: Aircon starts at 0 stock with no deployed units
         18 => 'SHT',
     ];
 
