@@ -26,6 +26,8 @@ class DatabaseSeeder extends Seeder
             DepartmentUserSeeder::class,   // 10. One user account per department
             StockIssuanceSeeder::class,    // 11. Sample stock issuances (decrements stock)
             RoomInventorySeeder::class,    // 12. Room locations + furniture assets (from NDB Excel reference)
+            FdcRoomInventorySeeder::class, // 13. FDC location + furniture assets (from FDC Excel reference)
+            CdcRoomInventorySeeder::class, // 14. CDC locations + furniture assets (from CDC Excel reference)
         ]);
     }
 }

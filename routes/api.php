@@ -6,6 +6,20 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\CdcRoomFurnitureDisposalController;
+use App\Http\Controllers\Api\CdcRoomFurnitureItemController;
+use App\Http\Controllers\Api\CdcRoomFurnitureItemLogController;
+use App\Http\Controllers\Api\CdcRoomFurnitureItemVariantController;
+use App\Http\Controllers\Api\CdcRoomFurnitureLogController;
+use App\Http\Controllers\Api\CdcRoomInventoryController;
+use App\Http\Controllers\Api\CdcRoomPurchaseController;
+use App\Http\Controllers\Api\FdcRoomFurnitureDisposalController;
+use App\Http\Controllers\Api\FdcRoomFurnitureItemController;
+use App\Http\Controllers\Api\FdcRoomFurnitureItemLogController;
+use App\Http\Controllers\Api\FdcRoomFurnitureItemVariantController;
+use App\Http\Controllers\Api\FdcRoomFurnitureLogController;
+use App\Http\Controllers\Api\FdcRoomInventoryController;
+use App\Http\Controllers\Api\FdcRoomPurchaseController;
 use App\Http\Controllers\Api\InventoryStockController;
 use App\Http\Controllers\Api\ItemAssetController;
 use App\Http\Controllers\Api\ItemController;
@@ -132,4 +146,60 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('room-furniture-disposals', RoomFurnitureDisposalController::class)
         ->only(['index', 'store', 'destroy'])
         ->parameters(['room-furniture-disposals' => 'roomFurnitureDisposal']);
+
+    // ── FDC Room Furniture Inventory ──────────────────────────────────────────
+
+    // FDC inventory matrix (quantity per room × item)
+    Route::get('fdc-room-inventory/matrix',                    [FdcRoomInventoryController::class, 'matrix']);
+    Route::put('fdc-room-inventory/cell/{roomId}/{itemId}',    [FdcRoomInventoryController::class, 'updateCell']);
+    Route::put('fdc-room-inventory/cell/{roomId}/{itemId}/{subItemId}', [FdcRoomInventoryController::class, 'updateVariantCell']);
+    Route::put('fdc-room-inventory/room/{room}',               [FdcRoomInventoryController::class, 'updateRoom']);
+
+    // FDC furniture item management (CRUD + stock)
+    Route::apiResource('fdc-room-furniture-items', FdcRoomFurnitureItemController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['fdc-room-furniture-items' => 'fdcRoomFurnitureItem']);
+
+    // FDC purchase / receive stock records
+    Route::post('fdc-room-purchases/{fdcRoomPurchase}/documents', [FdcRoomPurchaseController::class, 'storeDocuments']);
+    Route::apiResource('fdc-room-purchases', FdcRoomPurchaseController::class)->only(['index', 'store', 'destroy']);
+
+    // FDC variant management
+    Route::apiResource('fdc-room-furniture-item-variants', FdcRoomFurnitureItemVariantController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['fdc-room-furniture-item-variants' => 'roomFurnitureItemVariant']);
+
+    // FDC disposal tracking
+    Route::apiResource('fdc-room-furniture-disposals', FdcRoomFurnitureDisposalController::class)
+        ->only(['index', 'store', 'destroy'])
+        ->parameters(['fdc-room-furniture-disposals' => 'fdcRoomFurnitureDisposal']);
+
+    // FDC audit logs
+    Route::get('fdc-room-furniture-logs',      [FdcRoomFurnitureLogController::class,     'index']);
+    Route::get('fdc-room-furniture-item-logs', [FdcRoomFurnitureItemLogController::class, 'index']);
+
+    // ── CDC Room Furniture Inventory ──────────────────────────────────────────
+
+    Route::get('cdc-room-inventory/matrix',                                  [CdcRoomInventoryController::class, 'matrix']);
+    Route::put('cdc-room-inventory/cell/{roomId}/{itemId}',                  [CdcRoomInventoryController::class, 'updateCell']);
+    Route::put('cdc-room-inventory/cell/{roomId}/{itemId}/{subItemId}',      [CdcRoomInventoryController::class, 'updateVariantCell']);
+    Route::put('cdc-room-inventory/room/{room}',                             [CdcRoomInventoryController::class, 'updateRoom']);
+
+    Route::apiResource('cdc-room-furniture-items', CdcRoomFurnitureItemController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['cdc-room-furniture-items' => 'cdcRoomFurnitureItem']);
+
+    Route::post('cdc-room-purchases/{cdcRoomPurchase}/documents', [CdcRoomPurchaseController::class, 'storeDocuments']);
+    Route::apiResource('cdc-room-purchases', CdcRoomPurchaseController::class)->only(['index', 'store', 'destroy']);
+
+    Route::apiResource('cdc-room-furniture-item-variants', CdcRoomFurnitureItemVariantController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['cdc-room-furniture-item-variants' => 'roomFurnitureItemVariant']);
+
+    Route::apiResource('cdc-room-furniture-disposals', CdcRoomFurnitureDisposalController::class)
+        ->only(['index', 'store', 'destroy'])
+        ->parameters(['cdc-room-furniture-disposals' => 'cdcRoomFurnitureDisposal']);
+
+    Route::get('cdc-room-furniture-logs',      [CdcRoomFurnitureLogController::class,     'index']);
+    Route::get('cdc-room-furniture-item-logs', [CdcRoomFurnitureItemLogController::class, 'index']);
 });

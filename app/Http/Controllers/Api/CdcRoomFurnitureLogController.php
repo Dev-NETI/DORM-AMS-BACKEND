@@ -3,27 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\RoomFurnitureLog;
+use App\Models\CdcRoomFurnitureLog;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class RoomFurnitureLogController extends Controller
+class CdcRoomFurnitureLogController extends Controller
 {
     use ApiResponse;
 
-    /**
-     * GET /api/room-furniture-logs
-     *
-     * Filters: room_id, item_id, action_type, location_id, date_from, date_to
-     * Pagination: page, per_page (default 50)
-     */
+    /** GET /api/cdc-room-furniture-logs */
     public function index(Request $request): JsonResponse
     {
-        $query = RoomFurnitureLog::with([
+        $query = CdcRoomFurnitureLog::with([
             'room.location',
             'item',
-            'purchase',
             'performedBy',
         ])->orderByDesc('created_at');
 
@@ -39,17 +33,9 @@ class RoomFurnitureLogController extends Controller
             $query->where('action_type', $request->action_type);
         }
 
-        // Filter by location area (join through rooms)
         if ($request->filled('location_id')) {
             $query->whereHas('room', fn ($q) =>
                 $q->where('room_location_id', $request->location_id)
-            );
-        }
-
-        // Filter by location type (e.g. 'fdc' vs NDB)
-        if ($request->filled('location_type')) {
-            $query->whereHas('room.location', fn ($q) =>
-                $q->where('location_type', $request->location_type)
             );
         }
 
