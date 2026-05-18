@@ -3,67 +3,77 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\FdcRoomFurnitureDisposal;
+use App\Models\FdcRoomFurnitureStock;
 use App\Models\Item;
 use App\Models\Room;
 use App\Models\RoomFurniture;
-use App\Models\RoomFurnitureDisposal;
 use App\Models\RoomFurnitureItemVariant;
-use App\Models\RoomFurnitureLog;
-use App\Models\RoomFurnitureStock;
+use App\Models\FdcRoomFurnitureLog;
 use App\Models\RoomLocation;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class RoomInventoryController extends Controller
+class FdcRoomInventoryController extends Controller
 {
     use ApiResponse;
 
+    private function fdcRoomIds()
+    {
+        return Room::whereHas('location', fn ($q) => $q->where('location_type', 'fdc'))->pluck('id');
+    }
+
     /**
-     * Return the full matrix.
-     * Items with variants return variant-level cell data.
-     * Items without variants return simple {qty} cell data.
+     * Return the full FDC matrix.
+     * GET /api/fdc-room-inventory/matrix
      */
     public function matrix(): JsonResponse
     {
-        // Only furniture items registered in room_furniture_stock
-        $items = Item::whereHas('roomFurnitureStock')
-            ->with(['roomFurnitureStock', 'roomFurnitureVariants'])
+        $fdcRoomIds = $this->fdcRoomIds();
+
+        // Items that have an FDC stock record (base row)
+        $itemIds = FdcRoomFurnitureStock::whereNull('sub_item_id')->pluck('item_id');
+
+        $items = Item::whereIn('id', $itemIds)
+            ->with(['roomFurnitureVariants'])
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        // Preload deployed quantities per item (NDB rooms only, excluding FDC)
-        $itemIds    = $items->pluck('id');
-        $ndbRoomIds = Room::whereHas('location', fn ($q) => $q->whereNotIn('location_type', ['fdc', 'cdc']))->pluck('id');
-        $deployed   = RoomFurniture::whereIn('item_id', $itemIds)
-            ->whereIn('room_id', $ndbRoomIds)
+        // Deployed counts — only FDC rooms
+        $deployed = RoomFurniture::whereIn('item_id', $itemIds)
+            ->whereIn('room_id', $fdcRoomIds)
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
-        // For variant items, total stock = sum of per-variant stock records
-        $variantStockTotals = RoomFurnitureStock::whereIn('item_id', $itemIds)
+        // Variant stock totals from FDC table
+        $variantStockTotals = FdcRoomFurnitureStock::whereIn('item_id', $itemIds)
             ->whereNotNull('sub_item_id')
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(total_quantity) as total')
             ->pluck('total', 'item_id');
 
-        // Disposal quantities per item (base and variant-sum)
-        $disposalBase = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+        // Base stock from FDC table
+        $baseStocks = FdcRoomFurnitureStock::whereIn('item_id', $itemIds)
+            ->whereNull('sub_item_id')
+            ->pluck('total_quantity', 'item_id');
+
+        // Disposal from FDC table
+        $disposalBase = FdcRoomFurnitureDisposal::whereIn('item_id', $itemIds)
             ->whereNull('sub_item_id')
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
-        $disposalVariant = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+        $disposalVariant = FdcRoomFurnitureDisposal::whereIn('item_id', $itemIds)
             ->whereNotNull('sub_item_id')
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
 
-        // Build items data with has_variants flag and variant list
-        $itemsData = $items->map(function (Item $item) use ($deployed, $variantStockTotals, $disposalBase, $disposalVariant) {
+        $itemsData = $items->map(function (Item $item) use ($deployed, $variantStockTotals, $baseStocks, $disposalBase, $disposalVariant) {
             $dep      = (int) ($deployed[$item->id] ?? 0);
             $variants = $item->roomFurnitureVariants->map(fn ($v) => [
                 'id'   => $v->id,
@@ -71,9 +81,9 @@ class RoomInventoryController extends Controller
             ])->values();
 
             $hasVariants = $variants->isNotEmpty();
-            $rawTotal = $hasVariants
+            $rawTotal    = $hasVariants
                 ? (int) ($variantStockTotals[$item->id] ?? 0)
-                : ($item->roomFurnitureStock?->total_quantity ?? 0);
+                : (int) ($baseStocks[$item->id] ?? 0);
 
             $forDisposal = $hasVariants
                 ? (int) ($disposalVariant[$item->id] ?? 0)
@@ -93,16 +103,17 @@ class RoomInventoryController extends Controller
             ];
         });
 
-        // Collect item IDs that have variants
         $variantItemIds = $itemsData->where('has_variants', true)->pluck('id')->all();
 
-        // All NDB locations (exclude FDC) with rooms + their furniture
-        $locations = RoomLocation::whereNotIn('location_type', ['fdc', 'cdc'])
+        // Only FDC locations with rooms, furniture filtered to FDC items
+        $locations = RoomLocation::where('location_type', 'fdc')
             ->with([
                 'rooms'           => fn ($q) => $q->orderBy('room_number'),
-                'rooms.furniture',
+                'rooms.furniture' => fn ($q) => $q->whereIn('item_id', $itemIds->all()),
                 'rooms.furniture.subItem',
-            ])->orderBy('name')->get();
+            ])
+            ->orderBy('name')
+            ->get();
 
         $grandTotals = [];
 
@@ -117,7 +128,6 @@ class RoomInventoryController extends Controller
                     $itemId = (int) $itemId;
 
                     if (in_array($itemId, $variantItemIds, true)) {
-                        // Variant item: list of assigned sub-items with qty
                         $variants = $records->map(fn ($rf) => [
                             'sub_item_id' => $rf->sub_item_id,
                             'name'        => $rf->subItem?->name ?? '?',
@@ -132,7 +142,6 @@ class RoomInventoryController extends Controller
                         ];
                         $subtotals[$itemId] = ($subtotals[$itemId] ?? 0) + $total;
                     } else {
-                        // Simple item: single qty value
                         $qty = $records->first()->quantity;
                         $quantities[$itemId] = [
                             'type' => 'simple',
@@ -174,7 +183,7 @@ class RoomInventoryController extends Controller
 
     /**
      * Update a simple (non-variant) cell: room × item.
-     * PUT /api/room-inventory/cell/{roomId}/{itemId}
+     * PUT /api/fdc-room-inventory/cell/{roomId}/{itemId}
      */
     public function updateCell(Request $request, int $roomId, int $itemId): JsonResponse
     {
@@ -194,11 +203,11 @@ class RoomInventoryController extends Controller
         $qtyAfter  = $validated['quantity'];
 
         if ($qtyAfter > 0) {
-            $stock = RoomFurnitureStock::where('item_id', $itemId)->whereNull('sub_item_id')->first();
+            $stock = FdcRoomFurnitureStock::where('item_id', $itemId)->whereNull('sub_item_id')->first();
             if ($stock) {
-                $ndbRoomIds      = Room::whereHas('location', fn ($q) => $q->whereNotIn('location_type', ['fdc', 'cdc']))->pluck('id');
-                $forDisposal     = (int) RoomFurnitureDisposal::where('item_id', $itemId)->whereNull('sub_item_id')->sum('quantity');
-                $currentDeployed = (int) RoomFurniture::where('item_id', $itemId)->whereIn('room_id', $ndbRoomIds)->sum('quantity');
+                $fdcRoomIds      = $this->fdcRoomIds();
+                $forDisposal     = (int) FdcRoomFurnitureDisposal::where('item_id', $itemId)->whereNull('sub_item_id')->sum('quantity');
+                $currentDeployed = (int) RoomFurniture::where('item_id', $itemId)->whereIn('room_id', $fdcRoomIds)->sum('quantity');
                 $newDeployed     = $currentDeployed - $qtyBefore + $qtyAfter;
                 $netTotal        = max(0, $stock->total_quantity - $forDisposal);
                 if ($newDeployed > $netTotal) {
@@ -224,7 +233,7 @@ class RoomInventoryController extends Controller
         }
 
         if ($qtyBefore !== $qtyAfter) {
-            RoomFurnitureLog::record(
+            FdcRoomFurnitureLog::record(
                 roomId:     $roomId,
                 itemId:     $itemId,
                 actionType: 'adjustment',
@@ -240,7 +249,7 @@ class RoomInventoryController extends Controller
 
     /**
      * Update a variant cell: room × item × sub-item.
-     * PUT /api/room-inventory/cell/{roomId}/{itemId}/{subItemId}
+     * PUT /api/fdc-room-inventory/cell/{roomId}/{itemId}/{subItemId}
      */
     public function updateVariantCell(Request $request, int $roomId, int $itemId, int $subItemId): JsonResponse
     {
@@ -260,16 +269,15 @@ class RoomInventoryController extends Controller
         $qtyAfter  = $validated['quantity'];
 
         if ($qtyAfter > 0) {
-            // Validate against this specific variant's stock
-            $stock = RoomFurnitureStock::where('item_id', $itemId)
+            $stock = FdcRoomFurnitureStock::where('item_id', $itemId)
                 ->where('sub_item_id', $subItemId)
                 ->first();
             if ($stock) {
-                $ndbRoomIds      = Room::whereHas('location', fn ($q) => $q->whereNotIn('location_type', ['fdc', 'cdc']))->pluck('id');
-                $forDisposal     = (int) RoomFurnitureDisposal::where('item_id', $itemId)->where('sub_item_id', $subItemId)->sum('quantity');
+                $fdcRoomIds      = $this->fdcRoomIds();
+                $forDisposal     = (int) FdcRoomFurnitureDisposal::where('item_id', $itemId)->where('sub_item_id', $subItemId)->sum('quantity');
                 $currentDeployed = (int) RoomFurniture::where('item_id', $itemId)
                     ->where('sub_item_id', $subItemId)
-                    ->whereIn('room_id', $ndbRoomIds)
+                    ->whereIn('room_id', $fdcRoomIds)
                     ->sum('quantity');
                 $newDeployed = $currentDeployed - $qtyBefore + $qtyAfter;
                 $netTotal    = max(0, $stock->total_quantity - $forDisposal);
@@ -296,7 +304,7 @@ class RoomInventoryController extends Controller
         }
 
         if ($qtyBefore !== $qtyAfter) {
-            RoomFurnitureLog::record(
+            FdcRoomFurnitureLog::record(
                 roomId:     $roomId,
                 itemId:     $itemId,
                 actionType: 'adjustment',
@@ -311,8 +319,8 @@ class RoomInventoryController extends Controller
     }
 
     /**
-     * Bulk update all quantities for a single room (non-variant items only).
-     * PUT /api/room-inventory/room/{room}
+     * Bulk update all quantities for a single FDC room.
+     * PUT /api/fdc-room-inventory/room/{room}
      */
     public function updateRoom(Request $request, Room $room): JsonResponse
     {
@@ -321,15 +329,16 @@ class RoomInventoryController extends Controller
             'quantities.*' => 'integer|min:0',
         ]);
 
-        $ndbRoomIds   = Room::whereHas('location', fn ($q) => $q->whereNotIn('location_type', ['fdc', 'cdc']))->pluck('id');
+        $fdcRoomIds = $this->fdcRoomIds();
+
         $itemIds      = array_keys($validated['quantities']);
-        $stocks       = RoomFurnitureStock::whereIn('item_id', $itemIds)->whereNull('sub_item_id')->get()->keyBy('item_id');
+        $stocks       = FdcRoomFurnitureStock::whereIn('item_id', $itemIds)->whereNull('sub_item_id')->get()->keyBy('item_id');
         $deployedSums = RoomFurniture::whereIn('item_id', $itemIds)
-            ->whereIn('room_id', $ndbRoomIds)
+            ->whereIn('room_id', $fdcRoomIds)
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
             ->pluck('total', 'item_id');
-        $disposalSums = RoomFurnitureDisposal::whereIn('item_id', $itemIds)
+        $disposalSums = FdcRoomFurnitureDisposal::whereIn('item_id', $itemIds)
             ->whereNull('sub_item_id')
             ->groupBy('item_id')
             ->selectRaw('item_id, SUM(quantity) as total')
@@ -352,7 +361,7 @@ class RoomInventoryController extends Controller
                 $netTotal    = max(0, $stock->total_quantity - $forDisposal);
                 $newDeployed = (int) ($deployedSums[$itemId] ?? 0) - $current + $qtyAfter;
                 if ($newDeployed > $netTotal) {
-                    $item = Item::find($itemId);
+                    $item      = Item::find($itemId);
                     $available = max(0, $netTotal - (int) ($deployedSums[$itemId] ?? 0) + $current);
                     return $this->error(
                         "Insufficient stock for \"{$item?->name}\". Only {$available} unit(s) available.",
@@ -383,7 +392,7 @@ class RoomInventoryController extends Controller
                 }
 
                 if ($qtyBefore !== $qtyAfter) {
-                    RoomFurnitureLog::record(
+                    FdcRoomFurnitureLog::record(
                         roomId:     $room->id,
                         itemId:     $itemId,
                         actionType: 'adjustment',
@@ -395,6 +404,6 @@ class RoomInventoryController extends Controller
             }
         });
 
-        return $this->success(null, 'Room inventory updated');
+        return $this->success(null, 'FDC room inventory updated');
     }
 }
