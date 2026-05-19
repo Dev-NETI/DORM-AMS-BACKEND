@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             RoomInventorySeeder::class,    // 12. Room locations + furniture assets (from NDB Excel reference)
             FdcRoomInventorySeeder::class, // 13. FDC location + furniture assets (from FDC Excel reference)
             CdcRoomInventorySeeder::class, // 14. CDC locations + furniture assets (from CDC Excel reference)
+            ConsumableSeeder::class,       // 15. Cleaning supplies categories + items (NDB & NGH)
         ]);
     }
 }

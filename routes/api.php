@@ -1,6 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\ConsumableAuditController;
+use App\Http\Controllers\Api\ConsumableCategoryController;
+use App\Http\Controllers\Api\ConsumableIssuanceController;
+use App\Http\Controllers\Api\ConsumableItemController;
+use App\Http\Controllers\Api\ConsumableInventoryController;
+use App\Http\Controllers\Api\ConsumableMonthlyController;
+use App\Http\Controllers\Api\ConsumableReceivalController;
 use App\Http\Controllers\Api\AssetAssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
@@ -100,9 +107,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ── Consumable stock management ───────────────────────────────────────────
     // Stock levels per item per department
-    Route::get('inventory-stocks',                    [InventoryStockController::class, 'index']);
-    Route::get('inventory-stocks/{item}/{department}', [InventoryStockController::class, 'show']);
-    Route::post('inventory-stocks/adjust',            [InventoryStockController::class, 'adjust']);
+    Route::get('inventory-stocks',                         [InventoryStockController::class, 'index']);
+    Route::get('inventory-stocks/{item}/{department}',      [InventoryStockController::class, 'show']);
+    Route::post('inventory-stocks/adjust',                 [InventoryStockController::class, 'adjust']);
+    Route::patch('inventory-stocks/{itemId}/min-stock',    [InventoryStockController::class, 'setMinStock']);
 
     // Receive new consumable stock (creates StockReceival + increments InventoryStock)
     Route::post('stock-receivals/import',                               [StockReceivalController::class, 'import']);
@@ -202,4 +210,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('cdc-room-furniture-logs',      [CdcRoomFurnitureLogController::class,     'index']);
     Route::get('cdc-room-furniture-item-logs', [CdcRoomFurnitureItemLogController::class, 'index']);
+
+    // ── Cleaning Supplies (Consumable Inventory) ──────────────────────────────
+    // Sub-routes MUST be declared before the plain GET to avoid route conflicts
+    Route::get('consumable-inventory/template',  [ConsumableInventoryController::class, 'template']);
+    Route::post('consumable-inventory/import',   [ConsumableInventoryController::class, 'import']);
+    Route::post('consumable-inventory/remark',   [ConsumableInventoryController::class, 'saveRemark']);
+    // Daily inventory view (mirrors GalleyInventoryController pattern)
+    Route::get('consumable-inventory',           [ConsumableInventoryController::class, 'index']);
+
+    Route::apiResource('consumable-categories', ConsumableCategoryController::class);
+    Route::apiResource('consumable-items',      ConsumableItemController::class);
+
+    Route::apiResource('consumable-receivals',  ConsumableReceivalController::class)->only(['store', 'destroy']);
+    Route::apiResource('consumable-issuances',  ConsumableIssuanceController::class)->only(['store', 'destroy']);
+
+    Route::get('consumable-audit-logs', [ConsumableAuditController::class, 'index']);
 });

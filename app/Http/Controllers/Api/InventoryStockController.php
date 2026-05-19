@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\InventoryStock;
+use App\Models\Item;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -95,5 +96,21 @@ class InventoryStockController extends Controller
         $stock->load(['item.unit', 'department']);
 
         return $this->success($stock, 'Stock adjusted successfully');
+    }
+
+    /**
+     * Update the minimum stock threshold for an item.
+     * PATCH /api/inventory-stocks/{itemId}/min-stock
+     */
+    public function setMinStock(Request $request, int $itemId): JsonResponse
+    {
+        $validated = $request->validate([
+            'min_stock_level' => 'required|numeric|min:0',
+        ]);
+
+        $item = Item::findOrFail($itemId);
+        $item->update(['min_stock_level' => $validated['min_stock_level']]);
+
+        return $this->success(['min_stock_level' => $item->min_stock_level], 'Minimum stock level updated.');
     }
 }
