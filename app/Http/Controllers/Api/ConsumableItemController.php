@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\ConsumableAuditLog;
 use App\Models\ConsumableCategory;
 use App\Models\ConsumableItem;
+use App\Models\ConsumableStock;
 use App\Models\InventoryStock;
 use App\Models\Item;
 use App\Traits\ApiResponse;
@@ -55,7 +56,10 @@ class ConsumableItemController extends Controller
         $consumableItem = ConsumableItem::create($validated);
         $consumableItem->load(['category', 'unit']);
 
-        // Create inventory_stock if category has a department
+        // Create dedicated consumable stock record
+        ConsumableStock::create(['consumable_item_id' => $consumableItem->id, 'quantity' => 0]);
+
+        // Create inventory_stock if category has a department (mirror pattern)
         $dept = $consumableItem->category?->department_id;
         if ($dept && $mirrorItem->id) {
             InventoryStock::firstOrCreate(

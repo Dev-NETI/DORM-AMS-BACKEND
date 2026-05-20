@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConsumableAuditLog;
 use App\Models\ConsumableItem;
 use App\Models\ConsumableReceival;
+use App\Models\ConsumableStock;
 use App\Models\InventoryStock;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -75,20 +76,30 @@ class ConsumableReceivalController extends Controller
         return $this->success(null, 'Receival deleted.');
     }
 
-    /** Increment (+) or decrement (−) inventory_stock for this item's category department. */
+    /** Increment (+) or decrement (−) both consumable_stocks and the mirror inventory_stocks. */
     private function adjustStock(?ConsumableItem $item, float $delta): void
     {
-        if (! $item || ! $item->item_id) return;
+        if (! $item) return;
 
-        $deptId = $item->category?->department_id;
-        if (! $deptId) return;
-
-        $stock = InventoryStock::firstOrCreate(
-            ['item_id' => $item->item_id, 'department_id' => $deptId],
+        // Dedicated consumable stock table
+        $stock = ConsumableStock::firstOrCreate(
+            ['consumable_item_id' => $item->id],
             ['quantity' => 0]
         );
-
         $stock->quantity = max(0, (float) $stock->quantity + $delta);
         $stock->save();
+
+        // Mirror update to inventory_stocks (keeps /inventory-stocks page in sync)
+        if ($item->item_id) {
+            $deptId = $item->category?->department_id;
+            if ($deptId) {
+                $mirror = InventoryStock::firstOrCreate(
+                    ['item_id' => $item->item_id, 'department_id' => $deptId],
+                    ['quantity' => 0]
+                );
+                $mirror->quantity = max(0, (float) $mirror->quantity + $delta);
+                $mirror->save();
+            }
+        }
     }
 }
