@@ -8,6 +8,7 @@ use App\Models\ConsumableIssuance;
 use App\Models\ConsumableItem;
 use App\Models\ConsumableReceival;
 use App\Models\ConsumableRemark;
+use App\Models\ConsumableStock;
 use App\Models\InventoryStock;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesExcelImport;
@@ -52,12 +53,11 @@ class ConsumableInventoryController extends Controller
             return $this->success([]);
         }
 
-        $itemIds   = $items->pluck('id')->all();
-        $mirrorIds = $items->pluck('item_id')->filter()->values()->all();
+        $itemIds = $items->pluck('id')->all();
 
-        // Current live stock from inventory_stocks (keyed by mirror item_id)
-        $currentStocks = InventoryStock::whereIn('item_id', $mirrorIds)
-            ->pluck('quantity', 'item_id');
+        // Current live stock from consumable_stocks (keyed by consumable_item_id)
+        $currentStocks = ConsumableStock::whereIn('consumable_item_id', $itemIds)
+            ->pluck('quantity', 'consumable_item_id');
 
         // Issuances STRICTLY AFTER the date
         $issuancesAfter = ConsumableIssuance::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
@@ -107,10 +107,9 @@ class ConsumableInventoryController extends Controller
         // Build result
         $result = [];
         foreach ($items as $item) {
-            $id       = $item->id;
-            $mirrorId = $item->item_id;
+            $id = $item->id;
 
-            $currentQty = (float) ($currentStocks[$mirrorId] ?? 0);
+            $currentQty = (float) ($currentStocks[$id] ?? 0);
             $issAfter   = (float) ($issuancesAfter[$id] ?? 0);
             $recAfter   = (float) ($receivalsAfter[$id] ?? 0);
             $add        = (float) ($receivalsOn[$id] ?? 0);
@@ -240,11 +239,14 @@ class ConsumableInventoryController extends Controller
             return $this->error('No data rows found in the file.', 422);
         }
 
-        // Pre-load all active items keyed by lower-case name
-        $itemMap = ConsumableItem::where('is_active', true)
-            ->with('item')
-            ->get()
-            ->keyBy(fn ($i) => strtolower(trim($i->name)));
+        // Pre-load all active items keyed by "category:item" (compound) to prevent
+        // name collisions when the same item name exists in multiple categories (e.g. NDB vs NGH).
+        // A plain item-name key is also kept as fallback for rows where Category is blank.
+        $allItems  = ConsumableItem::where('is_active', true)->with(['item', 'category'])->get();
+        $itemMapCompound = $allItems->mapWithKeys(
+            fn ($i) => [strtolower(trim($i->category?->name ?? '')) . ':' . strtolower(trim($i->name)) => $i]
+        );
+        $itemMapSimple = $allItems->keyBy(fn ($i) => strtolower(trim($i->name)));
 
         $imported = 0;
         $skipped  = 0;
@@ -253,6 +255,7 @@ class ConsumableInventoryController extends Controller
         foreach ($rows as $index => $row) {
             $rowNum   = $index + 2;
             $itemName = trim((string) ($row['item'] ?? $row['item_name'] ?? ''));
+            $catName  = trim((string) ($row['category'] ?? ''));
             $qtyRaw   = trim((string) ($row['quantity'] ?? ''));
             $dateRaw  = trim((string) ($row['date_received'] ?? ''));
             $notes    = trim((string) ($row['notes'] ?? ''));
@@ -263,10 +266,14 @@ class ConsumableInventoryController extends Controller
                 continue;
             }
 
-            // Validate item exists
-            $consumableItem = $itemMap[strtolower($itemName)] ?? null;
+            // Validate item exists — prefer compound "category:item" lookup to avoid
+            // collisions when the same name exists in both NDB and NGH categories.
+            $compoundKey = strtolower($catName) . ':' . strtolower($itemName);
+            $consumableItem = $itemMapCompound[$compoundKey]
+                ?? ($catName === '' ? ($itemMapSimple[strtolower($itemName)] ?? null) : null);
+
             if (! $consumableItem) {
-                $errors[] = ['row' => $rowNum, 'item' => $itemName, 'message' => "Item \"{$itemName}\" not found."];
+                $errors[] = ['row' => $rowNum, 'item' => $itemName, 'message' => "Item \"{$itemName}\" not found in category \"{$catName}\"."];
                 continue;
             }
 
@@ -300,11 +307,22 @@ class ConsumableInventoryController extends Controller
                         'received_by'        => $request->user()?->id,
                     ]);
 
-                    // Update mirror inventory stock
+                    // Update consumable stock (dedicated table)
+                    $stock = ConsumableStock::firstOrCreate(
+                        ['consumable_item_id' => $consumableItem->id],
+                        ['quantity' => 0]
+                    );
+                    $stock->increment('quantity', (float) $qtyRaw);
+
+                    // Mirror update to inventory_stocks
                     if ($consumableItem->item_id) {
-                        $stock = InventoryStock::where('item_id', $consumableItem->item_id)->first();
-                        if ($stock) {
-                            $stock->increment('quantity', (float) $qtyRaw);
+                        $deptId = $consumableItem->category?->department_id;
+                        if ($deptId) {
+                            $mirror = InventoryStock::firstOrCreate(
+                                ['item_id' => $consumableItem->item_id, 'department_id' => $deptId],
+                                ['quantity' => 0]
+                            );
+                            $mirror->increment('quantity', (float) $qtyRaw);
                         }
                     }
 

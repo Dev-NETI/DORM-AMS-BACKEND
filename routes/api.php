@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ConsumableItemController;
 use App\Http\Controllers\Api\ConsumableInventoryController;
 use App\Http\Controllers\Api\ConsumableMonthlyController;
 use App\Http\Controllers\Api\ConsumableReceivalController;
+use App\Http\Controllers\Api\ConsumableStockController;
 use App\Http\Controllers\Api\AssetAssignmentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
@@ -134,6 +135,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('room-inventory/room/{room}',               [RoomInventoryController::class, 'updateRoom']);
 
     // Furniture item management (CRUD + stock)
+    Route::get('room-furniture-items/template',  [RoomFurnitureItemController::class, 'template']);
+    Route::post('room-furniture-items/import',   [RoomFurnitureItemController::class, 'import']);
     Route::apiResource('room-furniture-items', RoomFurnitureItemController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['room-furniture-items' => 'roomFurnitureItem']);
@@ -164,6 +167,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('fdc-room-inventory/room/{room}',               [FdcRoomInventoryController::class, 'updateRoom']);
 
     // FDC furniture item management (CRUD + stock)
+    Route::get('fdc-room-furniture-items/template',  [FdcRoomFurnitureItemController::class, 'template']);
+    Route::post('fdc-room-furniture-items/import',   [FdcRoomFurnitureItemController::class, 'import']);
     Route::apiResource('fdc-room-furniture-items', FdcRoomFurnitureItemController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['fdc-room-furniture-items' => 'fdcRoomFurnitureItem']);
@@ -193,6 +198,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('cdc-room-inventory/cell/{roomId}/{itemId}/{subItemId}',      [CdcRoomInventoryController::class, 'updateVariantCell']);
     Route::put('cdc-room-inventory/room/{room}',                             [CdcRoomInventoryController::class, 'updateRoom']);
 
+    Route::get('cdc-room-furniture-items/template',  [CdcRoomFurnitureItemController::class, 'template']);
+    Route::post('cdc-room-furniture-items/import',   [CdcRoomFurnitureItemController::class, 'import']);
     Route::apiResource('cdc-room-furniture-items', CdcRoomFurnitureItemController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['cdc-room-furniture-items' => 'cdcRoomFurnitureItem']);
@@ -210,6 +217,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('cdc-room-furniture-logs',      [CdcRoomFurnitureLogController::class,     'index']);
     Route::get('cdc-room-furniture-item-logs', [CdcRoomFurnitureItemLogController::class, 'index']);
+
+    // ── Consumable stock levels (dedicated table) ─────────────────────────────
+    Route::patch('consumable-stocks/{itemId}/min-stock', [ConsumableStockController::class, 'setMinStock']);
+    Route::get('consumable-stocks',                      [ConsumableStockController::class, 'index']);
 
     // ── Cleaning Supplies (Consumable Inventory) ──────────────────────────────
     // Sub-routes MUST be declared before the plain GET to avoid route conflicts

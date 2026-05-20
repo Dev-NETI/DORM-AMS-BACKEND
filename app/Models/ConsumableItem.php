@@ -6,6 +6,7 @@ use App\Traits\HasModifiedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ConsumableItem extends Model
 {
@@ -17,11 +18,13 @@ class ConsumableItem extends Model
         'unit_id',
         'item_id',
         'is_active',
+        'min_stock_level',
         'created_by',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'       => 'boolean',
+        'min_stock_level' => 'float',
     ];
 
     public function category(): BelongsTo
@@ -58,5 +61,10 @@ class ConsumableItem extends Model
     public function issuances(): HasMany
     {
         return $this->hasMany(ConsumableIssuance::class);
+    }
+
+    public function stock(): HasOne
+    {
+        return $this->hasOne(ConsumableStock::class);
     }
 }
