@@ -169,20 +169,17 @@ class ConsumableInventoryController extends Controller
      */
     public function template(): StreamedResponse
     {
-        $items = ConsumableItem::with(['unit', 'category'])
+        $items = ConsumableItem::with(['category'])
             ->where('is_active', true)
             ->orderBy('consumable_category_id')
             ->orderBy('name')
             ->get();
 
-        $headers = ['Category', 'Item', 'Unit', 'Date Received', 'Quantity', 'Notes'];
+        $headers = ['Category', 'Item', 'Quantity'];
 
         $sampleRows = $items->map(fn ($item) => [
             $item->category?->name ?? '',
             $item->name,
-            $item->unit?->abbreviation ?? '',
-            date('Y-m-d'),
-            '',
             '',
         ])->toArray();
 
@@ -190,20 +187,18 @@ class ConsumableInventoryController extends Controller
             $headers,
             $sampleRows,
             "Column guide:\n" .
-            "• Category       — pre-filled; do not change.\n" .
-            "• Item           — pre-filled; do not change.\n" .
-            "• Unit           — pre-filled; do not change.\n" .
-            "• Date Received  — required; format YYYY-MM-DD (e.g. " . date('Y-m-d') . ").\n" .
-            "• Quantity       — required; positive number.\n" .
-            "• Notes          — optional; free text.\n\n" .
-            "Leave Quantity blank to skip a row (it will be ignored during import)."
+            "• Category  — pre-filled; do not change.\n" .
+            "• Item      — pre-filled; do not change.\n" .
+            "• Quantity  — required; positive number.\n\n" .
+            "Leave Quantity blank to skip a row (it will be ignored during import).\n" .
+            "Date Received will be set automatically to today's date."
         );
 
-        // Lock Category, Item, Unit columns (A–C) visually with light fill
-        $sheet    = $spreadsheet->getActiveSheet();
-        $lastRow  = max(count($sampleRows) + 1, 2);
+        // Lock Category and Item columns (A–B) visually with light fill
+        $sheet   = $spreadsheet->getActiveSheet();
+        $lastRow = max(count($sampleRows) + 1, 2);
 
-        $sheet->getStyle("A2:C{$lastRow}")->applyFromArray([
+        $sheet->getStyle("A2:B{$lastRow}")->applyFromArray([
             'fill' => [
                 'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'F0F4FF'],
@@ -211,8 +206,8 @@ class ConsumableInventoryController extends Controller
             'font' => ['color' => ['rgb' => '555555']],
         ]);
 
-        // Highlight the columns the user must fill
-        $sheet->getStyle("D2:E{$lastRow}")->applyFromArray([
+        // Highlight the Quantity column the user must fill
+        $sheet->getStyle("C2:C{$lastRow}")->applyFromArray([
             'fill' => [
                 'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FFFDE7'],
@@ -226,8 +221,9 @@ class ConsumableInventoryController extends Controller
      * Import receivals from an uploaded Excel file.
      * POST /api/consumable-inventory/import
      *
-     * Expects columns: Category, Item, Unit, Date Received, Quantity, Notes
+     * Expects columns: Category, Item, Quantity
      * Rows with blank Quantity are skipped.
+     * Date Received defaults to today automatically.
      */
     public function import(Request $request): JsonResponse
     {
@@ -257,8 +253,6 @@ class ConsumableInventoryController extends Controller
             $itemName = trim((string) ($row['item'] ?? $row['item_name'] ?? ''));
             $catName  = trim((string) ($row['category'] ?? ''));
             $qtyRaw   = trim((string) ($row['quantity'] ?? ''));
-            $dateRaw  = trim((string) ($row['date_received'] ?? ''));
-            $notes    = trim((string) ($row['notes'] ?? ''));
 
             // Skip rows with no item name or blank quantity (user left them empty)
             if ($itemName === '' || $qtyRaw === '') {
@@ -283,27 +277,16 @@ class ConsumableInventoryController extends Controller
                 continue;
             }
 
-            // Validate / default date
-            $receivedDate = null;
-            if ($dateRaw !== '') {
-                $parsed = date_create($dateRaw);
-                if (! $parsed) {
-                    $errors[] = ['row' => $rowNum, 'item' => $itemName, 'message' => "Date Received \"{$dateRaw}\" is not a valid date."];
-                    continue;
-                }
-                $receivedDate = $parsed->format('Y-m-d');
-            } else {
-                $receivedDate = now()->format('Y-m-d');
-            }
+            $receivedDate = now()->format('Y-m-d');
 
             try {
-                DB::transaction(function () use ($consumableItem, $qtyRaw, $receivedDate, $notes, $request) {
+                DB::transaction(function () use ($consumableItem, $qtyRaw, $receivedDate, $request) {
                     // Create receival record
                     ConsumableReceival::create([
                         'consumable_item_id' => $consumableItem->id,
                         'quantity'           => (float) $qtyRaw,
                         'received_date'      => $receivedDate,
-                        'notes'              => $notes ?: null,
+                        'notes'              => null,
                         'received_by'        => $request->user()?->id,
                     ]);
 
