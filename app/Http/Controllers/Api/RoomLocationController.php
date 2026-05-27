@@ -38,6 +38,13 @@ class RoomLocationController extends Controller
             $query->where('location_type', $request->location_type);
         }
 
+        if ($request->filled('scope') && $request->scope === 'ndb') {
+            $query->where(function ($q) {
+                $q->whereNull('location_type')
+                    ->orWhereNotIn('location_type', ['fdc', 'cdc']);
+            });
+        }
+
         return $this->success($query->orderBy('name')->get());
     }
 
