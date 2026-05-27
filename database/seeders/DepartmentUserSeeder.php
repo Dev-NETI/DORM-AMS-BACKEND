@@ -14,23 +14,32 @@ class DepartmentUserSeeder extends Seeder
         $dept = fn(string $code) => Department::where('code', $code)->first()?->id;
 
         $defaultPermissions = json_encode([
-            'categories',
-            'suppliers',
-            'items',
-            'item-assets',
-            'asset-assignments',
-            'inventory-stocks',
-            'stock-receivals',
-            'stock-issuances',
+            // Administration
+            // 'departments',
             'units',
-            'room-assets',
-            'room-locations'
+            // 'employees',
+            // 'users',
+            // Fixed Assets
+            'room-inventory',
+            'fdc-room-inventory',
+            'cdc-room-inventory',
+            // Cleaning Supplies
+            'consumables',
+            'inventory-stocks',
         ]);
 
         $users = [
             [
-                'name'          => 'DOD Administrator',
-                'email'         => 'dod@neti.com.ph',
+                'name'          => 'Cathy Villareal',
+                'email'         => 'cathy.villareal@neti.com.ph',
+                'password'      => Hash::make('password'),
+                'user_type'     => 'employee',
+                'department_id' => $dept('DOD'),
+                'permissions'   => $defaultPermissions,
+            ],
+            [
+                'name'          => 'Maureen Pasia',
+                'email'         => 'maureen.pasia@neti.com.ph',
                 'password'      => Hash::make('password'),
                 'user_type'     => 'employee',
                 'department_id' => $dept('DOD'),
