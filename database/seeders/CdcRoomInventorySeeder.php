@@ -14,56 +14,104 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class CdcRoomInventorySeeder extends Seeder
 {
-    // ── CDC item list (unique items across all CDC sections) ───────────────────
+    // ── CDC item list ──────────────────────────────────────────────────────────
+    // Items 0–21 correspond to the main room section columns (0-based col 1..22).
+    // Items 22+ are from admin office, hallway, and classroom sections.
     private const ITEMS = [
-        ['name' => 'Single Bed with Mattress',     'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Bed Bunks',                    'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Closet',                       'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Cabinet for Fridge',           'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Clip Hangers',                 'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Hangers',                      'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Mini Fridge',                  'cat' => 'Electronics & Appliances'],
-        ['name' => 'Throw Pillow',                 'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Pillows',                      'cat' => 'Furniture & Fixtures'],
-        ['name' => 'TV Remote',                    'cat' => 'Electronics & Appliances'],
-        ['name' => 'LED TV',                       'cat' => 'Electronics & Appliances'],
-        ['name' => 'Study Chair',                  'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Study Table',                  'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Water Kettle',                 'cat' => 'Electronics & Appliances'],
-        ['name' => 'Study Lamp',                   'cat' => 'Fixtures & Lighting'],
-        ['name' => 'Water Heater',                 'cat' => 'Electronics & Appliances'],
-        ['name' => 'Aircon',                       'cat' => 'Electronics & Appliances'],
-        ['name' => 'Aircon Remote',                'cat' => 'Electronics & Appliances'],
-        ['name' => 'Window Curtain',               'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Doormats',                     'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Trashbins',                    'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Fire Extinguisher',            'cat' => 'Safety Equipment'],
-        ['name' => 'Office Table',                 'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Office Chair',                 'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Sofa 3 Seater',                'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Sofa 2 Seater',                'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Center Table',                 'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Stainless Cabinet',            'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Printer',                      'cat' => 'Electronics & Appliances'],
-        ['name' => 'Side Table',                   'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Console Table',                'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Telephone',                    'cat' => 'Electronics & Appliances'],
-        ['name' => 'Water Dispenser (Fabriano)',   'cat' => 'Electronics & Appliances'],
-        ['name' => 'Sliding Wooden Cabinet',       'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Aircon (Aux)',                 'cat' => 'Electronics & Appliances'],
-        ['name' => 'Water Dispenser',              'cat' => 'Electronics & Appliances'],
-        ['name' => 'Brown Cabinet',                'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Wall Frame',                   'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Sofa 1 Seater',                'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Steel Bench (Black)',           'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Guard Table',                  'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Cigarette Ashtray Bin',        'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Training Tables',              'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Colored Chairs',               'cat' => 'Furniture & Fixtures'],
-        ['name' => 'Monitor',                      'cat' => 'Electronics & Appliances'],
+        // ── Main room section (rows 4-55, rooms 1-23) ─────────────────────────
+        ['name' => 'Single Bed with Mattress',   'cat' => 'Furniture & Fixtures'],      // col 1
+        ['name' => 'Bed Bunks',                  'cat' => 'Furniture & Fixtures'],      // col 2
+        ['name' => 'Closet',                     'cat' => 'Furniture & Fixtures'],      // col 3
+        ['name' => 'Cabinet for Fridge',         'cat' => 'Furniture & Fixtures'],      // col 4
+        ['name' => 'Clip Hangers',               'cat' => 'Furniture & Fixtures'],      // col 5
+        ['name' => 'Hangers',                    'cat' => 'Furniture & Fixtures'],      // col 6
+        ['name' => 'Mini Fridge',                'cat' => 'Electronics & Appliances'], // col 7
+        ['name' => 'Throw Pillow',               'cat' => 'Furniture & Fixtures'],      // col 8
+        ['name' => 'Pillows',                    'cat' => 'Furniture & Fixtures'],      // col 9
+        ['name' => 'TV Remote',                  'cat' => 'Electronics & Appliances'], // col 10
+        ['name' => 'LED TV',                     'cat' => 'Electronics & Appliances'], // col 11
+        ['name' => 'Study Chair',                'cat' => 'Furniture & Fixtures'],      // col 12
+        ['name' => 'Study Table',                'cat' => 'Furniture & Fixtures'],      // col 13
+        ['name' => 'Water Kettle',               'cat' => 'Electronics & Appliances'], // col 14
+        ['name' => 'Study Lamp',                 'cat' => 'Fixtures & Lighting'],       // col 15
+        ['name' => 'Water Heater',               'cat' => 'Electronics & Appliances'], // col 16
+        ['name' => 'Aircon',                     'cat' => 'Electronics & Appliances'], // col 17
+        ['name' => 'Aircon Remote',              'cat' => 'Electronics & Appliances'], // col 18
+        ['name' => 'Window Curtain',             'cat' => 'Furniture & Fixtures'],      // col 19
+        ['name' => 'Doormats',                   'cat' => 'Furniture & Fixtures'],      // col 20
+        ['name' => 'Trashbins',                  'cat' => 'Furniture & Fixtures'],      // col 21
+        ['name' => 'Fire Extinguisher',          'cat' => 'Safety Equipment'],          // col 22
+        // ── Admin Office (hardcoded from Excel row 57-58) ─────────────────────
+        ['name' => 'Office Table',               'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Office Chair',               'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Sofa 3 Seater',              'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Sofa 2 Seater',              'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Center Table',               'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Stainless Cabinet',          'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Printer',                    'cat' => 'Electronics & Appliances'],
+        ['name' => 'Side Table',                 'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Console Table',              'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Telephone',                  'cat' => 'Electronics & Appliances'],
+        ['name' => 'Water Dispenser (Fabriano)', 'cat' => 'Electronics & Appliances'],
+        ['name' => 'Sliding Wooden Cabinet',     'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Aircon (Aux)',               'cat' => 'Electronics & Appliances'],
+        // ── Hallway & Lobby ────────────────────────────────────────────────────
+        ['name' => 'Water Dispenser',            'cat' => 'Electronics & Appliances'],
+        ['name' => 'Brown Cabinet',              'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Wall Frame',                 'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Sofa 1 Seater',              'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Steel Bench (Black)',        'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Guard Table',                'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Cigarette Ashtray Bin',      'cat' => 'Furniture & Fixtures'],
+        // ── Classrooms ─────────────────────────────────────────────────────────
+        ['name' => 'Training Tables',            'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Colored Chairs',             'cat' => 'Furniture & Fixtures'],
+        ['name' => 'Monitor',                    'cat' => 'Electronics & Appliances'],
     ];
 
-    // ── CDC locations and rooms ────────────────────────────────────────────────
+    // ── Hardcoded totals for non-room sections (from CDC Excel reference) ──────
+    // Admin Office (Excel row 58):
+    //   Office Table=2, Office Chair=2, Sofa 3 Seater=1, Sofa 2 Seater=1,
+    //   Center Table=1, Stainless Cabinet=1, Printer=1, Side Table=1,
+    //   Console Table=1, Telephone=1, Water Dispenser(Fabriano)=1,
+    //   Sliding Wooden Cabinet=1, Aircon(Aux)=1
+    // Hallway & Lobby (Excel row 63):
+    //   Water Dispenser=1, Sofa 2 Seater=2, Fire Extinguisher=4, Side Table=4,
+    //   Brown Cabinet=1, Wall Frame=2, Sofa 3 Seater=1, Sofa 1 Seater=2,
+    //   Center Table=1, Water Dispenser(Fabriano)=1, Steel Bench(Black)=5,
+    //   Guard Table=1, Cigarette Ashtray Bin=1
+    // Classrooms (rooms 1-8, Aircon=7, Colored Chairs=75, Monitor=7):
+    //   Aircon adds to main Aircon total
+    private const NON_ROOM_TOTALS = [
+        // item name => total qty
+        'Office Table'               => 2,
+        'Office Chair'               => 2,
+        'Sofa 3 Seater'              => 2,   // 1 admin + 1 hallway
+        'Sofa 2 Seater'              => 3,   // 1 admin + 2 hallway (B+K)
+        'Center Table'               => 2,   // 1 admin + 1 hallway
+        'Stainless Cabinet'          => 1,
+        'Printer'                    => 1,
+        'Side Table'                 => 5,   // 1 admin + 4 hallway
+        'Console Table'              => 1,
+        'Telephone'                  => 1,
+        'Water Dispenser (Fabriano)' => 2,   // 1 admin + 1 hallway
+        'Sliding Wooden Cabinet'     => 1,
+        'Aircon (Aux)'               => 1,
+        'Water Dispenser'            => 4,   // 1 hallway + 3 classrooms (rooms 5,6,7)
+        'Brown Cabinet'              => 1,
+        'Wall Frame'                 => 2,
+        'Sofa 1 Seater'              => 2,
+        'Steel Bench (Black)'        => 5,
+        'Guard Table'                => 1,
+        'Cigarette Ashtray Bin'      => 1,
+        'Fire Extinguisher'          => 4,   // hallway (adds to room total)
+        'Training Tables'            => 0,
+        'Colored Chairs'             => 75,  // 3 classrooms × 25
+        'Monitor'                    => 7,   // classrooms 1-7
+        'Aircon'                     => 7,   // classrooms 1-4, 6-8 (room 5 no aircon in data)
+    ];
+
+    // ── CDC locations ──────────────────────────────────────────────────────────
     private const CDC_LOCATIONS = [
         [
             'name'  => 'CDC 2nd Floor',
@@ -100,9 +148,9 @@ class CdcRoomInventorySeeder extends Seeder
         }
 
         // ── 2. Units ──────────────────────────────────────────────────────────
-        $unitPiece = Unit::firstOrCreate(['name' => 'Piece'], ['abbreviation' => 'pcs']);
+        $unitPiece = Unit::firstOrCreate(['abbreviation' => 'pcs'], ['name' => 'Piece']);
 
-        // ── 3. Item definitions + CDC stock records ───────────────────────────
+        // ── 3. Item definitions ───────────────────────────────────────────────
         $itemList = [];
         foreach (self::ITEMS as $def) {
             $item = Item::firstOrCreate(
@@ -114,10 +162,6 @@ class CdcRoomInventorySeeder extends Seeder
                     'description'     => "CDC room {$def['name']}",
                     'min_stock_level' => 0,
                 ],
-            );
-            CdcRoomFurnitureStock::firstOrCreate(
-                ['item_id' => $item->id, 'sub_item_id' => null],
-                ['total_quantity' => 0]
             );
             $itemList[] = $item;
         }
@@ -132,90 +176,75 @@ class CdcRoomInventorySeeder extends Seeder
                     'floor'         => $locDef['floor'],
                 ],
             );
-
             foreach ($locDef['rooms'] as $roomNum) {
-                $room         = Room::firstOrCreate(
-                    ['room_number' => $roomNum, 'room_location_id' => $location->id],
-                );
+                $room         = Room::firstOrCreate(['room_number' => $roomNum, 'room_location_id' => $location->id]);
                 $allRoomIds[] = $room->id;
             }
         }
 
-        // ── 5. Read Excel quantities ──────────────────────────────────────────
+        // ── 5. Parse Excel for main room section totals ───────────────────────
+        // Only process rows with integer room numbers 1-23 (CDC 2nd floor rooms).
+        // Cols 1-22 map to items[0..21] via itemIndex = colIdx - 1.
+        $totals   = array_fill(0, count(self::ITEMS), 0); // indexed by position in ITEMS
         $filePath = storage_path('app/public/references/CDC FURNITURE INVENTORY 2026 2.xlsx');
 
-        if (! file_exists($filePath)) {
-            $this->command->warn('  CdcRoomInventorySeeder: Reference file not found: ' . $filePath);
-            $this->command->warn('  CDC locations and rooms created; re-run with the file to populate quantities.');
-            return;
+        if (file_exists($filePath)) {
+            $rows = IOFactory::load($filePath)->getActiveSheet()->toArray(null, true, false, false);
+
+            foreach (array_slice($rows, 3) as $row) {
+                $colA = trim((string) ($row[0] ?? ''));
+
+                if ($colA === '' || ! $this->isMainRoomRow($colA)) {
+                    continue;
+                }
+
+                // Cols 1..22 map to items[0..21]
+                for ($colIdx = 1; $colIdx <= 22; $colIdx++) {
+                    $cellVal = trim((string) ($row[$colIdx] ?? ''));
+                    if ($cellVal === '' || $cellVal === '0') {
+                        continue;
+                    }
+                    if (! preg_match('/^(\d+)/', $cellVal, $m)) {
+                        continue;
+                    }
+                    $qty = (int) $m[1];
+                    if ($qty > 0) {
+                        $totals[$colIdx - 1] += $qty;
+                    }
+                }
+            }
+        } else {
+            $this->command->warn('  CdcRoomInventorySeeder: Reference file not found — stock totals set to 0.');
         }
 
-        $spreadsheet    = IOFactory::load($filePath);
-        $rows           = $spreadsheet->getActiveSheet()->toArray(null, true, false, false);
-        $totalFurniture = 0;
-
-        // Build a room lookup: room_number@location_name → Room
-        // We need to match rows from Excel to the right rooms
-        foreach (array_slice($rows, 3) as $row) {
-            $colA = trim((string) ($row[0] ?? ''));
-            if ($colA === '') {
-                continue;
-            }
-
-            // Try to match this row's room number against any CDC room
-            $matchedRoom = Room::whereIn('id', $allRoomIds)
-                ->where('room_number', $colA)
-                ->first();
-
-            if (! $matchedRoom) {
-                continue;
-            }
-
-            // Scan columns 1..N for numeric quantities
-            foreach ($row as $colIdx => $cellVal) {
-                if ($colIdx === 0) {
-                    continue; // skip room number column
+        // ── 6. Add non-room section totals ────────────────────────────────────
+        foreach (self::NON_ROOM_TOTALS as $itemName => $qty) {
+            foreach ($itemList as $idx => $item) {
+                if ($item->name === $itemName) {
+                    $totals[$idx] += $qty;
+                    break;
                 }
-                $cellStr = trim((string) ($cellVal ?? ''));
-                if ($cellStr === '' || $cellStr === '0') {
-                    continue;
-                }
-                if (! preg_match('/^(\d+)/', $cellStr, $m)) {
-                    continue;
-                }
-                $qty = (int) $m[1];
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                // Map column index to item (col 1 = first item, col 2 = second item, etc.)
-                $itemIndex = $colIdx - 1; // 0-based item index
-                if (! isset($itemList[$itemIndex])) {
-                    continue;
-                }
-
-                $item = $itemList[$itemIndex];
-                RoomFurniture::updateOrCreate(
-                    ['room_id' => $matchedRoom->id, 'item_id' => $item->id, 'sub_item_id' => null],
-                    ['quantity' => $qty],
-                );
-                $totalFurniture++;
             }
         }
 
-        // ── 6. Sync cdc_room_furniture_stocks totals ──────────────────────────
-        $allRoomIdsCollection = collect($allRoomIds);
-        foreach ($itemList as $item) {
-            $deployed = RoomFurniture::where('item_id', $item->id)
-                ->whereIn('room_id', $allRoomIdsCollection)
-                ->sum('quantity');
-            CdcRoomFurnitureStock::where('item_id', $item->id)
-                ->whereNull('sub_item_id')
-                ->update(['total_quantity' => $deployed]);
+        // ── 7. Clear room_furniture rows for all CDC rooms ────────────────────
+        $deleted = RoomFurniture::whereIn('room_id', $allRoomIds)->delete();
+
+        // ── 8. Upsert cdc_room_furniture_stock totals ─────────────────────────
+        foreach ($itemList as $idx => $item) {
+            CdcRoomFurnitureStock::updateOrCreate(
+                ['item_id' => $item->id, 'sub_item_id' => null],
+                ['total_quantity' => $totals[$idx]],
+            );
         }
 
-        $locationCount = count(self::CDC_LOCATIONS);
-        $roomCount     = count($allRoomIds);
-        $this->command->info("  CdcRoomInventorySeeder: {$locationCount} CDC locations, {$roomCount} rooms, {$totalFurniture} furniture quantity rows seeded.");
+        $nonZero = count(array_filter($totals, fn($q) => $q > 0));
+        $this->command->info("  CdcRoomInventorySeeder: {$nonZero} item types with stock. Matrix cleared ({$deleted} rows removed).");
+    }
+
+    /** Match only main room rows: integers 1-23 (CDC 2nd floor rooms). */
+    private function isMainRoomRow(string $value): bool
+    {
+        return (bool) preg_match('/^\d+$/', $value) && (int) $value >= 1 && (int) $value <= 23;
     }
 }

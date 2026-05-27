@@ -16,26 +16,47 @@ class FdcRoomInventorySeeder extends Seeder
 {
     // ── FDC item list ──────────────────────────────────────────────────────────
     private const ITEMS = [
-        ['name' => 'Single Bed with Mattress',   'code' => 'SBD', 'cat' => 'Furniture & Fixtures',      'col' => 1],
-        ['name' => 'Double Bed with Mattress',   'code' => 'DBL', 'cat' => 'Furniture & Fixtures',      'col' => 2],
-        ['name' => 'Bed Bunks',                  'code' => 'BNK', 'cat' => 'Furniture & Fixtures',      'col' => 3],
-        ['name' => 'Closet',                     'code' => 'CLO', 'cat' => 'Furniture & Fixtures',      'col' => 4],
-        ['name' => 'Hangers',                    'code' => 'HNG', 'cat' => 'Furniture & Fixtures',      'col' => 5],
-        ['name' => 'Study Table with Chair',     'code' => 'STC', 'cat' => 'Furniture & Fixtures',      'col' => 6],
-        ['name' => 'Study Lamp',                 'code' => 'SLP', 'cat' => 'Fixtures & Lighting',       'col' => 7],
-        ['name' => 'Night Table',                'code' => 'NTB', 'cat' => 'Furniture & Fixtures',      'col' => 8],
-        ['name' => 'Night Lampshade',            'code' => 'NLS', 'cat' => 'Fixtures & Lighting',       'col' => 9],
-        ['name' => 'AC Remote',                  'code' => 'ACR', 'cat' => 'Electronics & Appliances',  'col' => 10],
-        ['name' => 'Shower Curtain',             'code' => 'SCT', 'cat' => 'Bathroom & Fixtures',       'col' => 11],
-        ['name' => 'Garbage Bin',                'code' => 'GBN', 'cat' => 'Furniture & Fixtures',      'col' => 12],
-        ['name' => 'Doormat',                    'code' => 'DMT', 'cat' => 'Furniture & Fixtures',      'col' => 13],
-        ['name' => 'Window Curtain Set',         'code' => 'WCS', 'cat' => 'Furniture & Fixtures',      'col' => 14],
-        ['name' => 'Mini Fridge',                'code' => 'FRG', 'cat' => 'Electronics & Appliances',  'col' => 15],
-        ['name' => 'TV with Remote',             'code' => 'TVR', 'cat' => 'Electronics & Appliances',  'col' => 16],
-        ['name' => 'Cable with Remote',          'code' => 'CBR', 'cat' => 'Electronics & Appliances',  'col' => 17],
+        ['name' => 'Single Bed with Mattress',   'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'SBD'],
+        ['name' => 'Double Bed with Mattress',   'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'DBL'],
+        ['name' => 'Bed Bunks',                  'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'BNK'],
+        ['name' => 'Closet',                     'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'CLO'],
+        ['name' => 'Hangers',                    'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'HNG'],
+        ['name' => 'Study Table with Chair',     'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'STC'],
+        ['name' => 'Study Lamp',                 'cat' => 'Fixtures & Lighting',       'unit' => 'pcs', 'code' => 'SLP'],
+        ['name' => 'Night Table',                'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'NTB'],
+        ['name' => 'Night Lampshade',            'cat' => 'Fixtures & Lighting',       'unit' => 'pcs', 'code' => 'NLS'],
+        ['name' => 'AC Remote',                  'cat' => 'Electronics & Appliances',  'unit' => 'pcs', 'code' => 'ACR'],
+        ['name' => 'Shower Curtain',             'cat' => 'Bathroom & Fixtures',       'unit' => 'pcs', 'code' => 'SCT'],
+        ['name' => 'Garbage Bin',                'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'GBN'],
+        ['name' => 'Doormat',                    'cat' => 'Furniture & Fixtures',      'unit' => 'pcs', 'code' => 'DMT'],
+        ['name' => 'Window Curtain Set',         'cat' => 'Furniture & Fixtures',      'unit' => 'set', 'code' => 'WCS'],
+        ['name' => 'Mini Fridge',                'cat' => 'Electronics & Appliances',  'unit' => 'pcs', 'code' => 'FRG'],
+        ['name' => 'TV with Remote',             'cat' => 'Electronics & Appliances',  'unit' => 'pcs', 'code' => 'TVR'],
+        ['name' => 'Cable with Remote',          'cat' => 'Electronics & Appliances',  'unit' => 'pcs', 'code' => 'CBR'],
     ];
 
-    // ── FDC location: 1 location with rooms 1–52 ─────────────────────────────
+    // ── Excel column index (0-based) → item code ──────────────────────────────
+    private const COL_TO_CODE = [
+        1  => 'SBD',  // B = Single Bed with Mattress
+        2  => 'DBL',  // C = Double Bed with Mattress
+        3  => 'BNK',  // D = Bed Bunks
+        4  => 'CLO',  // E = Closet
+        5  => 'HNG',  // F = Hangers
+        6  => 'STC',  // G = Study Table with Chair
+        7  => 'SLP',  // H = Study Lamp
+        8  => 'NTB',  // I = Night Table
+        9  => 'NLS',  // J = Night Lampshade
+        10 => 'ACR',  // K = AC Remote
+        11 => 'SCT',  // L = Shower Curtain
+        12 => 'GBN',  // M = Garbage Bin
+        13 => 'DMT',  // N = Doormat
+        14 => 'WCS',  // O = Window Curtain Set
+        15 => 'FRG',  // P = Mini Fridge
+        16 => 'TVR',  // Q = TV with Remote
+        17 => 'CBR',  // R = Cable with Remote
+    ];
+
+    // ── FDC: 1 location, rooms 1–52 ──────────────────────────────────────────
     private const FDC_LOCATION = [
         'name'  => 'FDC',
         'type'  => 'fdc',
@@ -49,28 +70,6 @@ class FdcRoomInventorySeeder extends Seeder
         '31','32','33','34','35','36','37','38','39','40',
         '41','42','43','44','45','46','47','48','49','50',
         '51','52',
-    ];
-
-    // ── Excel column index (0-based) → item code ──────────────────────────────
-    // Adjust these if the actual Excel column order differs
-    private const COL_TO_CODE = [
-        1  => 'SBD',  // Single Bed with Mattress
-        2  => 'DBL',  // Double Bed with Mattress
-        3  => 'BNK',  // Bed Bunks
-        4  => 'CLO',  // Closet
-        5  => 'HNG',  // Hangers
-        6  => 'STC',  // Study Table with Chair
-        7  => 'SLP',  // Study Lamp
-        8  => 'NTB',  // Night Table
-        9  => 'NLS',  // Night Lampshade
-        10 => 'ACR',  // AC Remote
-        11 => 'SCT',  // Shower Curtain
-        12 => 'GBN',  // Garbage Bin
-        13 => 'DMT',  // Doormat
-        14 => 'WCS',  // Window Curtain Set
-        15 => 'FRG',  // Mini Fridge
-        16 => 'TVR',  // TV with Remote
-        17 => 'CBR',  // Cable with Remote
     ];
 
     public function run(): void
@@ -89,13 +88,13 @@ class FdcRoomInventorySeeder extends Seeder
         }
 
         // ── 2. Units ──────────────────────────────────────────────────────────
-        $unitPiece = Unit::firstOrCreate(['name' => 'Piece'], ['abbreviation' => 'pcs']);
-        $unitSet   = Unit::firstOrCreate(['name' => 'Set'],   ['abbreviation' => 'set']);
+        $unitPiece = Unit::firstOrCreate(['abbreviation' => 'pcs'],  ['name' => 'Piece']);
+        $unitSet   = Unit::firstOrCreate(['abbreviation' => 'set'],   ['name' => 'Set']);
 
         // ── 3. Item definitions + FDC stock records ───────────────────────────
         $itemByCode = [];
         foreach (self::ITEMS as $def) {
-            $unit = str_contains($def['name'], 'Set') ? $unitSet : $unitPiece;
+            $unit = $def['unit'] === 'set' ? $unitSet : $unitPiece;
             $item = Item::firstOrCreate(
                 ['name' => $def['name']],
                 [
@@ -106,9 +105,6 @@ class FdcRoomInventorySeeder extends Seeder
                     'min_stock_level' => 0,
                 ],
             );
-            // Ensure a FDC stock record exists (total_quantity will be updated later)
-            FdcRoomFurnitureStock::firstOrCreate(['item_id' => $item->id, 'sub_item_id' => null], ['total_quantity' => 0]);
-
             $itemByCode[$def['code']] = $item;
         }
 
@@ -121,87 +117,62 @@ class FdcRoomInventorySeeder extends Seeder
             ],
         );
 
-        $roomMap = []; // roomNumber => Room
+        $roomMap = [];
         foreach (self::FDC_ROOMS as $roomNum) {
-            $room          = Room::firstOrCreate(
-                ['room_number' => $roomNum, 'room_location_id' => $location->id],
-            );
+            $room              = Room::firstOrCreate(['room_number' => $roomNum, 'room_location_id' => $location->id]);
             $roomMap[$roomNum] = $room;
         }
 
-        // ── 5. Read Excel quantities ──────────────────────────────────────────
+        // ── 5. Parse Excel for per-room totals ────────────────────────────────
+        $totals   = array_fill_keys(array_column(self::ITEMS, 'code'), 0);
         $filePath = storage_path('app/public/references/FDC FURNITURE INVENTORY 2026 1.xlsx');
 
-        if (! file_exists($filePath)) {
-            $this->command->warn('  FdcRoomInventorySeeder: Reference file not found: ' . $filePath);
-            $this->command->warn('  FDC location and rooms created; re-run with the file to populate quantities.');
-            return;
+        if (file_exists($filePath)) {
+            $rows = IOFactory::load($filePath)->getActiveSheet()->toArray(null, true, false, false);
+
+            foreach (array_slice($rows, 3) as $row) {
+                $colA = trim((string) ($row[0] ?? ''));
+
+                if ($colA === '' || ! $this->isRoomRow($colA)) {
+                    continue; // skip headers, TOTAL rows, hallway/gym/office sections
+                }
+
+                foreach (self::COL_TO_CODE as $colIdx => $code) {
+                    $cellVal = trim((string) ($row[$colIdx] ?? ''));
+                    if ($cellVal === '' || $cellVal === '0') {
+                        continue;
+                    }
+                    if (! preg_match('/^(\d+)/', $cellVal, $m)) {
+                        continue;
+                    }
+                    $qty = (int) $m[1];
+                    if ($qty > 0) {
+                        $totals[$code] += $qty;
+                    }
+                }
+            }
+        } else {
+            $this->command->warn('  FdcRoomInventorySeeder: Reference file not found — stock totals set to 0.');
         }
 
-        $spreadsheet    = IOFactory::load($filePath);
-        $rows           = $spreadsheet->getActiveSheet()->toArray(null, true, false, false);
-        $totalFurniture = 0;
-
-        foreach (array_slice($rows, 3) as $row) {
-            $colA = trim((string) ($row[0] ?? ''));
-
-            if ($colA === '' || ! $this->isRoomRow($colA)) {
-                // Skip section headers, gym, office, hallway rows
-                continue;
-            }
-
-            $room = $roomMap[$colA] ?? null;
-            if (! $room) {
-                continue; // room not in our FDC list — skip
-            }
-
-            foreach (self::COL_TO_CODE as $colIdx => $code) {
-                $cellVal = trim((string) ($row[$colIdx] ?? ''));
-
-                if ($cellVal === '' || $cellVal === '0') {
-                    continue;
-                }
-
-                if (! preg_match('/^(\d+)/', $cellVal, $m)) {
-                    continue;
-                }
-
-                $qty = (int) $m[1];
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $item = $itemByCode[$code] ?? null;
-                if (! $item) {
-                    continue;
-                }
-
-                RoomFurniture::updateOrCreate(
-                    ['room_id' => $room->id, 'item_id' => $item->id, 'sub_item_id' => null],
-                    ['quantity' => $qty],
-                );
-
-                $totalFurniture++;
-            }
-        }
-
-        // ── 6. Sync fdc_room_furniture_stocks totals from actual deployed quantities
+        // ── 6. Clear room_furniture rows for FDC rooms ────────────────────────
         $fdcRoomIds = collect($roomMap)->pluck('id');
-        foreach ($itemByCode as $item) {
-            $deployed = RoomFurniture::where('item_id', $item->id)
-                ->whereIn('room_id', $fdcRoomIds)
-                ->sum('quantity');
-            FdcRoomFurnitureStock::where('item_id', $item->id)
-                ->whereNull('sub_item_id')
-                ->update(['total_quantity' => $deployed]);
+        $deleted    = RoomFurniture::whereIn('room_id', $fdcRoomIds)->delete();
+
+        // ── 7. Upsert fdc_room_furniture_stock totals ─────────────────────────
+        foreach ($itemByCode as $code => $item) {
+            FdcRoomFurnitureStock::updateOrCreate(
+                ['item_id' => $item->id, 'sub_item_id' => null],
+                ['total_quantity' => $totals[$code] ?? 0],
+            );
         }
 
-        $this->command->info("  FdcRoomInventorySeeder: 1 FDC location, 52 rooms, {$totalFurniture} furniture quantity rows seeded.");
+        $nonZero = collect($totals)->filter(fn($q) => $q > 0)->count();
+        $this->command->info("  FdcRoomInventorySeeder: {$nonZero} item types with stock. Matrix cleared ({$deleted} rows removed).");
     }
 
     private function isRoomRow(string $value): bool
     {
-        // Matches plain integers 1–52
         return (bool) preg_match('/^\d+$/', $value) && (int) $value >= 1 && (int) $value <= 52;
     }
 }

@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             InventoryStockSeeder::class,   // 9. Consumable stocks + stock receival records
             DepartmentUserSeeder::class,   // 10. One user account per department
             StockIssuanceSeeder::class,    // 11. Sample stock issuances (decrements stock)
-            RoomInventorySeeder::class,    // 12. Room locations + furniture assets (from NDB Excel reference)
+            RoomInventorySeeder::class,    // 12. NDB room locations, items, variants + stock totals (matrix empty)
             FdcRoomInventorySeeder::class, // 13. FDC location + furniture assets (from FDC Excel reference)
             CdcRoomInventorySeeder::class, // 14. CDC locations + furniture assets (from CDC Excel reference)
             ConsumableSeeder::class,       // 15. Cleaning supplies categories + items (NDB & NGH)
