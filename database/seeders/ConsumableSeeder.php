@@ -119,6 +119,23 @@ class ConsumableSeeder extends Seeder
         ];
 
         $this->seedItems($ngh->id, $nghItems, $cleaningCatId);
+
+        // ── Personal Care Kits ─────────────────────────────────────────────
+        $personalCareKits = ConsumableCategory::firstOrCreate(
+            ['name' => 'Personal Care Kits'],
+            ['description' => 'Personal care items for guests, such as toiletries and amenity kits'],
+        );
+
+        $personalCareItems = [
+            ['name' => 'INDOOR SLIPPERS PLUSH-WILLOW SO28(PLUSH TOWEL)',                         'unit' => 'pcs'],
+            ['name' => 'TOOTHPASTE 10 GMS',                             'unit' => 'pcs'],
+            ['name' => 'TOOTHBRUSH, WHITE TRANSPARENT',                           'unit' => 'pcs'],
+            ['name' => 'ROUND SOAP, 20 GMS',                   'unit' => 'pcs'],
+            ['name' => 'SHAMPOO W/ CONDITIONER, 10 ML',                                    'unit' => 'pcs'],
+            ['name' => 'PAPER PACKAGING GUEST AMENITY KIT',                         'unit' => 'pcs'],
+        ];
+
+        $this->seedItems($personalCareKits->id, $personalCareItems, $cleaningCatId);
     }
 
     private function seedItems(int $categoryId, array $items, int $cleaningCatId): void

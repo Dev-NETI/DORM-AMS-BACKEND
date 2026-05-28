@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\CoffeeWaterInventoryController;
+use App\Http\Controllers\Api\RequisitionController;
 use App\Http\Controllers\Api\ConsumableAuditController;
 use App\Http\Controllers\Api\ConsumableCategoryController;
 use App\Http\Controllers\Api\ConsumableIssuanceController;
@@ -249,6 +250,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('consumable-issuances',  ConsumableIssuanceController::class)->only(['store', 'destroy']);
 
     Route::get('consumable-audit-logs', [ConsumableAuditController::class, 'index']);
+
+    // ── Requisition Slip builder ───────────────────────────────────────────────
+    Route::post('requisition/items', [RequisitionController::class, 'items']);
 
     // ── Coffee & Bottled Water Inventory (weekly) ─────────────────────────────
     // Sub-routes MUST be declared before the plain GET to avoid route conflicts
