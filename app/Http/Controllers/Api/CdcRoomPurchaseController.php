@@ -124,6 +124,11 @@ class CdcRoomPurchaseController extends Controller
         return $this->success($uploaded, 'Documents uploaded');
     }
 
+    public function indexDocuments(CdcRoomPurchase $cdcRoomPurchase): JsonResponse
+    {
+        return $this->success($cdcRoomPurchase->documents()->orderBy('created_at')->get());
+    }
+
     public function destroy(CdcRoomPurchase $cdcRoomPurchase): JsonResponse
     {
         $cdcRoomPurchase->delete();

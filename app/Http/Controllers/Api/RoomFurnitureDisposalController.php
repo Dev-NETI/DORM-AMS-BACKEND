@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RoomFurniture;
 use App\Models\RoomFurnitureDisposal;
+use App\Models\RoomFurnitureDisposedDocument;
+use App\Models\RoomFurnitureDisposedHistory;
 use App\Models\RoomFurnitureStock;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -87,5 +89,54 @@ class RoomFurnitureDisposalController extends Controller
     {
         $roomFurnitureDisposal->delete();
         return $this->success(null, 'Disposal record removed');
+    }
+
+    /** POST /api/room-furniture-disposals/{disposal}/dispose */
+    public function dispose(Request $request, RoomFurnitureDisposal $roomFurnitureDisposal): JsonResponse
+    {
+        $request->validate([
+            'additional_notes' => 'nullable|string',
+            'disposed_at'      => 'nullable|date',
+            'documents'        => 'required|array|min:1',
+            'documents.*'      => 'required|file|mimes:pdf|max:20480',
+        ]);
+
+        $history = RoomFurnitureDisposedHistory::create([
+            'item_id'          => $roomFurnitureDisposal->item_id,
+            'sub_item_id'      => $roomFurnitureDisposal->sub_item_id,
+            'quantity'         => $roomFurnitureDisposal->quantity,
+            'additional_notes' => $request->input('additional_notes'),
+            'disposed_by'      => $request->user()?->id,
+            'disposed_at'      => $request->input('disposed_at') ?? now(),
+        ]);
+
+        foreach ($request->file('documents') as $file) {
+            $path = $file->store('disposal-documents/ndb', 'public');
+            RoomFurnitureDisposedDocument::create([
+                'disposed_history_id' => $history->id,
+                'file_path'           => $path,
+                'file_name'           => $file->getClientOriginalName(),
+            ]);
+        }
+
+        $roomFurnitureDisposal->delete();
+
+        return $this->success(
+            $history->load('item', 'subItem', 'disposedByUser:id,name', 'documents'),
+            'Item disposed successfully.'
+        );
+    }
+
+    /** GET /api/room-furniture-disposed-history */
+    public function history(): JsonResponse
+    {
+        $records = RoomFurnitureDisposedHistory::with([
+            'item.category',
+            'subItem',
+            'disposedByUser:id,name',
+            'documents',
+        ])->orderByDesc('disposed_at')->get();
+
+        return $this->success($records);
     }
 }

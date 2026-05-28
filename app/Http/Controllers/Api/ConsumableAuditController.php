@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsumableAuditLog;
+use App\Models\ConsumableItem;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,36 @@ class ConsumableAuditController extends Controller
         if ($request->filled('search')) {
             $q = $request->input('search');
             $query->where('description', 'like', "%{$q}%");
+        }
+
+        // Filter logs to only those related to a specific module's items
+        if ($request->filled('module')) {
+            $module  = $request->input('module');
+            $itemIds = ConsumableItem::whereHas('category', fn ($q) => $q->where('module', $module))
+                ->pluck('id')->all();
+
+            if (empty($itemIds)) {
+                $query->whereRaw('0 = 1');
+            } else {
+                $query->where(function ($q) use ($itemIds) {
+                    $q->where(function ($inner) use ($itemIds) {
+                        $inner->where('entity_type', 'issuance')
+                              ->whereIn('entity_id', fn ($sub) =>
+                                  $sub->select('id')->from('consumable_issuances')
+                                      ->whereIn('consumable_item_id', $itemIds)
+                              );
+                    })->orWhere(function ($inner) use ($itemIds) {
+                        $inner->where('entity_type', 'receival')
+                              ->whereIn('entity_id', fn ($sub) =>
+                                  $sub->select('id')->from('consumable_receivals')
+                                      ->whereIn('consumable_item_id', $itemIds)
+                              );
+                    })->orWhere(function ($inner) use ($itemIds) {
+                        $inner->where('entity_type', 'item')
+                              ->whereIn('entity_id', $itemIds);
+                    });
+                });
+            }
         }
 
         $perPage = min((int) $request->input('per_page', 30), 100);

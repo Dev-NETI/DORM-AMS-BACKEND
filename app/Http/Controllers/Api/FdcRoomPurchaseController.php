@@ -110,6 +110,11 @@ class FdcRoomPurchaseController extends Controller
         return $this->created($purchase, 'FDC stock received successfully');
     }
 
+    public function indexDocuments(FdcRoomPurchase $fdcRoomPurchase): JsonResponse
+    {
+        return $this->success($fdcRoomPurchase->documents()->orderBy('created_at')->get());
+    }
+
     public function storeDocuments(Request $request, FdcRoomPurchase $fdcRoomPurchase): JsonResponse
     {
         $request->validate([

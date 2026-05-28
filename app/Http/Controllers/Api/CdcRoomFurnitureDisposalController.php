@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CdcRoomFurnitureDisposal;
+use App\Models\CdcRoomFurnitureDisposedDocument;
+use App\Models\CdcRoomFurnitureDisposedHistory;
 use App\Models\CdcRoomFurnitureStock;
 use App\Models\Room;
 use App\Models\RoomFurniture;
@@ -79,5 +81,54 @@ class CdcRoomFurnitureDisposalController extends Controller
     {
         $cdcRoomFurnitureDisposal->delete();
         return $this->success(null, 'Disposal record removed');
+    }
+
+    /** POST /api/cdc-room-furniture-disposals/{disposal}/dispose */
+    public function dispose(Request $request, CdcRoomFurnitureDisposal $cdcRoomFurnitureDisposal): JsonResponse
+    {
+        $request->validate([
+            'additional_notes' => 'nullable|string',
+            'disposed_at'      => 'nullable|date',
+            'documents'        => 'required|array|min:1',
+            'documents.*'      => 'required|file|mimes:pdf|max:20480',
+        ]);
+
+        $history = CdcRoomFurnitureDisposedHistory::create([
+            'item_id'          => $cdcRoomFurnitureDisposal->item_id,
+            'sub_item_id'      => $cdcRoomFurnitureDisposal->sub_item_id,
+            'quantity'         => $cdcRoomFurnitureDisposal->quantity,
+            'additional_notes' => $request->input('additional_notes'),
+            'disposed_by'      => $request->user()?->id,
+            'disposed_at'      => $request->input('disposed_at') ?? now(),
+        ]);
+
+        foreach ($request->file('documents') as $file) {
+            $path = $file->store('disposal-documents/cdc', 'public');
+            CdcRoomFurnitureDisposedDocument::create([
+                'disposed_history_id' => $history->id,
+                'file_path'           => $path,
+                'file_name'           => $file->getClientOriginalName(),
+            ]);
+        }
+
+        $cdcRoomFurnitureDisposal->delete();
+
+        return $this->success(
+            $history->load('item', 'subItem', 'disposedByUser:id,name', 'documents'),
+            'Item disposed successfully.'
+        );
+    }
+
+    /** GET /api/cdc-room-furniture-disposed-history */
+    public function history(): JsonResponse
+    {
+        $records = CdcRoomFurnitureDisposedHistory::with([
+            'item.category',
+            'subItem',
+            'disposedByUser:id,name',
+            'documents',
+        ])->orderByDesc('disposed_at')->get();
+
+        return $this->success($records);
     }
 }

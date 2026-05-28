@@ -30,6 +30,10 @@ class ConsumableItemController extends Controller
             $query->where('is_active', true);
         }
 
+        if ($request->filled('module')) {
+            $query->whereHas('category', fn ($q) => $q->where('module', $request->input('module')));
+        }
+
         return $this->success($query->get());
     }
 
@@ -43,11 +47,15 @@ class ConsumableItemController extends Controller
 
         $validated['created_by'] = $request->user()?->id;
 
-        // Create a mirror entry in the items table (for inventory_stocks)
-        $cleaningCatId = $this->getCleaningSuppliesCategoryId();
+        // Determine the general category for the mirror item based on the consumable category's module
+        $consumableCategory = ConsumableCategory::find($validated['consumable_category_id']);
+        $generalCatId = $consumableCategory?->module === 'coffee_water'
+            ? $this->getCoffeeWaterCategoryId()
+            : $this->getCleaningSuppliesCategoryId();
+
         $mirrorItem = Item::create([
             'name'        => $validated['name'],
-            'category_id' => $cleaningCatId,
+            'category_id' => $generalCatId,
             'unit_id'     => $validated['unit_id'],
             'item_type'   => 'consumable',
         ]);
@@ -136,10 +144,18 @@ class ConsumableItemController extends Controller
     /** Find or create the "Cleaning Supplies" category in the general categories table. */
     private function getCleaningSuppliesCategoryId(): int
     {
-        $cat = Category::firstOrCreate(
+        return Category::firstOrCreate(
             ['name' => 'Cleaning Supplies'],
             ['name' => 'Cleaning Supplies']
-        );
-        return $cat->id;
+        )->id;
+    }
+
+    /** Find or create the "Coffee & Bottled Water" category in the general categories table. */
+    private function getCoffeeWaterCategoryId(): int
+    {
+        return Category::firstOrCreate(
+            ['name' => 'Coffee & Bottled Water'],
+            ['name' => 'Coffee & Bottled Water']
+        )->id;
     }
 }
