@@ -65,8 +65,8 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(10),
         ]);
 
-        Mail::to('sherwin.roxas@neti.com.ph')->send(new LoginVerificationCodeMail($code, $user->name));
-        // Mail::to($user->email)->send(new LoginVerificationCodeMail($code, $user->name));
+        // Mail::to('sherwin.roxas@neti.com.ph')->send(new LoginVerificationCodeMail($code, $user->name));
+        Mail::to($user->email)->send(new LoginVerificationCodeMail($code, $user->name));
 
         return response()->json([
             'requires_verification' => true,
@@ -146,8 +146,8 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(10),
         ]);
 
-        Mail::to('sherwin.roxas@neti.com.ph')->send(new LoginVerificationCodeMail($code, $user->name));
-        // Mail::to($user->email)->send(new LoginVerificationCodeMail($code, $user->name));
+        // Mail::to('sherwin.roxas@neti.com.ph')->send(new LoginVerificationCodeMail($code, $user->name));
+        Mail::to($user->email)->send(new LoginVerificationCodeMail($code, $user->name));
 
         return response()->json([
             'message' => 'A new verification code has been sent to your email.',
