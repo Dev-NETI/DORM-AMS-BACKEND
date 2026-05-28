@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AccountController;
+use App\Http\Controllers\Api\CoffeeWaterInventoryController;
 use App\Http\Controllers\Api\ConsumableAuditController;
 use App\Http\Controllers\Api\ConsumableCategoryController;
 use App\Http\Controllers\Api\ConsumableIssuanceController;
@@ -142,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['room-furniture-items' => 'roomFurnitureItem']);
 
     // Purchase / receive stock records
+    Route::get('room-purchases/{roomPurchase}/documents',  [RoomPurchaseController::class, 'indexDocuments']);
     Route::post('room-purchases/{roomPurchase}/documents', [RoomPurchaseController::class, 'storeDocuments']);
     Route::apiResource('room-purchases', RoomPurchaseController::class)->only(['index', 'store', 'destroy']);
 
@@ -154,6 +156,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['room-furniture-item-variants' => 'roomFurnitureItemVariant']);
 
     // Disposal tracking
+    Route::post('room-furniture-disposals/{roomFurnitureDisposal}/dispose', [RoomFurnitureDisposalController::class, 'dispose']);
+    Route::get('room-furniture-disposed-history', [RoomFurnitureDisposalController::class, 'history']);
     Route::apiResource('room-furniture-disposals', RoomFurnitureDisposalController::class)
         ->only(['index', 'store', 'destroy'])
         ->parameters(['room-furniture-disposals' => 'roomFurnitureDisposal']);
@@ -174,6 +178,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['fdc-room-furniture-items' => 'fdcRoomFurnitureItem']);
 
     // FDC purchase / receive stock records
+    Route::get('fdc-room-purchases/{fdcRoomPurchase}/documents',  [FdcRoomPurchaseController::class, 'indexDocuments']);
     Route::post('fdc-room-purchases/{fdcRoomPurchase}/documents', [FdcRoomPurchaseController::class, 'storeDocuments']);
     Route::apiResource('fdc-room-purchases', FdcRoomPurchaseController::class)->only(['index', 'store', 'destroy']);
 
@@ -183,6 +188,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters(['fdc-room-furniture-item-variants' => 'roomFurnitureItemVariant']);
 
     // FDC disposal tracking
+    Route::post('fdc-room-furniture-disposals/{fdcRoomFurnitureDisposal}/dispose', [FdcRoomFurnitureDisposalController::class, 'dispose']);
+    Route::get('fdc-room-furniture-disposed-history', [FdcRoomFurnitureDisposalController::class, 'history']);
     Route::apiResource('fdc-room-furniture-disposals', FdcRoomFurnitureDisposalController::class)
         ->only(['index', 'store', 'destroy'])
         ->parameters(['fdc-room-furniture-disposals' => 'fdcRoomFurnitureDisposal']);
@@ -204,6 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['cdc-room-furniture-items' => 'cdcRoomFurnitureItem']);
 
+    Route::get('cdc-room-purchases/{cdcRoomPurchase}/documents',  [CdcRoomPurchaseController::class, 'indexDocuments']);
     Route::post('cdc-room-purchases/{cdcRoomPurchase}/documents', [CdcRoomPurchaseController::class, 'storeDocuments']);
     Route::apiResource('cdc-room-purchases', CdcRoomPurchaseController::class)->only(['index', 'store', 'destroy']);
 
@@ -211,6 +219,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->only(['index', 'store', 'update', 'destroy'])
         ->parameters(['cdc-room-furniture-item-variants' => 'roomFurnitureItemVariant']);
 
+    Route::post('cdc-room-furniture-disposals/{cdcRoomFurnitureDisposal}/dispose', [CdcRoomFurnitureDisposalController::class, 'dispose']);
+    Route::get('cdc-room-furniture-disposed-history', [CdcRoomFurnitureDisposalController::class, 'history']);
     Route::apiResource('cdc-room-furniture-disposals', CdcRoomFurnitureDisposalController::class)
         ->only(['index', 'store', 'destroy'])
         ->parameters(['cdc-room-furniture-disposals' => 'cdcRoomFurnitureDisposal']);
@@ -227,6 +237,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('consumable-inventory/template',  [ConsumableInventoryController::class, 'template']);
     Route::post('consumable-inventory/import',   [ConsumableInventoryController::class, 'import']);
     Route::post('consumable-inventory/remark',   [ConsumableInventoryController::class, 'saveRemark']);
+    Route::get('consumable-inventory/top-usage', [ConsumableInventoryController::class, 'topUsage']);
     // Daily inventory view (mirrors GalleyInventoryController pattern)
     Route::get('consumable-inventory',           [ConsumableInventoryController::class, 'index']);
 
@@ -234,7 +245,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('consumable-items',      ConsumableItemController::class);
 
     Route::apiResource('consumable-receivals',  ConsumableReceivalController::class)->only(['store', 'destroy']);
+    Route::get('consumable-issuances/usage-history', [ConsumableIssuanceController::class, 'usageHistory']);
     Route::apiResource('consumable-issuances',  ConsumableIssuanceController::class)->only(['store', 'destroy']);
 
     Route::get('consumable-audit-logs', [ConsumableAuditController::class, 'index']);
+
+    // ── Coffee & Bottled Water Inventory (weekly) ─────────────────────────────
+    // Sub-routes MUST be declared before the plain GET to avoid route conflicts
+    Route::get('coffee-water-inventory/template',  [CoffeeWaterInventoryController::class, 'template']);
+    Route::post('coffee-water-inventory/import',   [CoffeeWaterInventoryController::class, 'import']);
+    Route::get('coffee-water-inventory',           [CoffeeWaterInventoryController::class, 'index']);
 });

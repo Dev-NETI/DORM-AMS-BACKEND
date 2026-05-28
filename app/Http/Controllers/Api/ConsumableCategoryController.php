@@ -17,10 +17,15 @@ class ConsumableCategoryController extends Controller
 {
     use ApiResponse;
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $categories = ConsumableCategory::with('department')->withCount('items')->orderBy('name')->get();
-        return $this->success($categories);
+        $query = ConsumableCategory::with('department')->withCount('items')->orderBy('name');
+
+        if ($request->filled('module')) {
+            $query->where('module', $request->input('module'));
+        }
+
+        return $this->success($query->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -29,7 +34,10 @@ class ConsumableCategoryController extends Controller
             'name'          => 'required|string|max:255|unique:consumable_categories,name',
             'description'   => 'nullable|string',
             'department_id' => 'nullable|exists:departments,id',
+            'module'        => 'nullable|string|in:cleaning_supplies,coffee_water',
         ]);
+
+        $validated['module'] = $validated['module'] ?? 'cleaning_supplies';
 
         $category = ConsumableCategory::create($validated);
 

@@ -16,6 +16,17 @@ class ConsumableIssuanceController extends Controller
 {
     use ApiResponse;
 
+    public function usageHistory(): JsonResponse
+    {
+        $suggestions = ConsumableIssuance::whereNotNull('usage_history')
+            ->where('usage_history', '!=', '')
+            ->orderByDesc('issued_date')
+            ->pluck('usage_history')
+            ->unique()
+            ->values();
+        return $this->success($suggestions, 'Usage history suggestions.');
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

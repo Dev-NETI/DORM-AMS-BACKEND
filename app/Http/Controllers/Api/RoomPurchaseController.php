@@ -111,6 +111,15 @@ class RoomPurchaseController extends Controller
     }
 
     /**
+     * List documents for a purchase record.
+     * GET /api/room-purchases/{roomPurchase}/documents
+     */
+    public function indexDocuments(RoomPurchase $roomPurchase): JsonResponse
+    {
+        return $this->success($roomPurchase->documents()->orderBy('created_at')->get());
+    }
+
+    /**
      * Upload documents for a purchase record.
      * POST /api/room-purchases/{roomPurchase}/documents
      */

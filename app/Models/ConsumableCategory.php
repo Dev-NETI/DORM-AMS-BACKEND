@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ConsumableCategory extends Model
 {
-    protected $fillable = ['name', 'description', 'department_id'];
+    protected $fillable = ['name', 'description', 'department_id', 'module'];
 
     public function items(): HasMany
     {

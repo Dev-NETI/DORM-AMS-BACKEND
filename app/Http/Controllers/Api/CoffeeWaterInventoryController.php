@@ -7,7 +7,6 @@ use App\Models\ConsumableAuditLog;
 use App\Models\ConsumableIssuance;
 use App\Models\ConsumableItem;
 use App\Models\ConsumableReceival;
-use App\Models\ConsumableRemark;
 use App\Models\ConsumableStock;
 use App\Models\InventoryStock;
 use App\Traits\ApiResponse;
@@ -18,86 +17,43 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class ConsumableInventoryController extends Controller
+class CoffeeWaterInventoryController extends Controller
 {
     use ApiResponse, HandlesExcelImport;
 
     /**
-     * Return daily inventory summary per item for a given date.
+     * Return weekly inventory summary for coffee/bottled water items.
      *
-     * Logic (mirrors GalleyInventoryController):
-     *   ending    = current_stock + issuances_after_date − receivals_after_date
-     *   add       = sum(receivals on date)
-     *   consumed  = sum(issuances on date)
-     *   beginning = ending − add + consumed   (i.e. ending of previous day)
+     * Same calculation as ConsumableInventoryController but scoped to
+     * module='coffee_water' categories and uses a week range instead of a day.
+     *
+     * Logic:
+     *   ending    = current_stock + issuances_after_week − receivals_after_week
+     *   add       = sum(receivals within week)
+     *   consumed  = sum(issuances within week)
+     *   beginning = ending − add + consumed
      *   total     = beginning + add
      *
-     * GET /api/consumable-inventory?date=YYYY-MM-DD[&category_id=N]
-     */
-    /**
-     * Return the top 5 most-consumed items within a given date range.
-     *
-     * GET /api/consumable-inventory/top-usage?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
-     * Defaults to current month when no params are supplied.
-     */
-    public function topUsage(Request $request): JsonResponse
-    {
-        $dateFrom = $request->get('date_from', Carbon::now()->startOfMonth()->toDateString());
-        $dateTo   = $request->get('date_to',   Carbon::now()->toDateString());
-        $limit    = max(1, min(20, (int) $request->get('limit', 5)));
-
-        $topItems = ConsumableIssuance::with('item')
-            ->whereBetween('issued_date', [$dateFrom, $dateTo])
-            ->selectRaw('consumable_item_id, SUM(quantity) as total_issued, COUNT(*) as issuance_count')
-            ->groupBy('consumable_item_id')
-            ->orderByDesc('total_issued')
-            ->limit($limit)
-            ->get();
-
-        $data = $topItems->map(function ($row) use ($dateFrom, $dateTo) {
-            $latestUsage = ConsumableIssuance::where('consumable_item_id', $row->consumable_item_id)
-                ->whereBetween('issued_date', [$dateFrom, $dateTo])
-                ->whereNotNull('usage_history')
-                ->where('usage_history', '!=', '')
-                ->latest('issued_date')
-                ->value('usage_history');
-
-            return [
-                'item_id'        => $row->consumable_item_id,
-                'item_name'      => $row->item?->name ?? 'Unknown',
-                'total_issued'   => (float) $row->total_issued,
-                'issuance_count' => (int) $row->issuance_count,
-                'latest_usage'   => $latestUsage,
-            ];
-        });
-
-        return $this->success([
-            'date_from' => $dateFrom,
-            'date_to'   => $dateTo,
-            'items'     => $data,
-        ], 'Top usage items.');
-    }
-
-    /**
-     * Return daily inventory summary per item for a given date.
-     *
-     * Logic (mirrors GalleyInventoryController):
-     *   ending    = current_stock + issuances_after_date − receivals_after_date
-     *   add       = sum(receivals on date)
-     *   consumed  = sum(issuances on date)
-     *   beginning = ending − add + consumed   (i.e. ending of previous day)
-     *   total     = beginning + add
-     *
-     * GET /api/consumable-inventory?date=YYYY-MM-DD[&category_id=N]
+     * GET /api/coffee-water-inventory?week=YYYY-Www[&category_id=N]
      */
     public function index(Request $request): JsonResponse
     {
-        $date   = $request->input('date', now()->toDateString());
-        $carbon = Carbon::parse($date)->startOfDay();
+        $weekStr = $request->input('week', now()->format('Y-\WW'));
+
+        // Parse ISO week string "2026-W22" → Monday and Sunday of that week
+        $parts   = explode('-W', $weekStr);
+        $year    = (int) ($parts[0] ?? now()->year);
+        $weekNum = (int) ($parts[1] ?? now()->isoWeek());
+
+        $weekStart = Carbon::now()->setISODate($year, $weekNum)->startOfWeek()->startOfDay();
+        $weekEnd   = (clone $weekStart)->endOfWeek()->endOfDay();
+
+        $dateFrom = $weekStart->toDateString();
+        $dateTo   = $weekEnd->toDateString();
 
         $itemQuery = ConsumableItem::with(['unit', 'category'])
             ->where('is_active', true)
-            ->whereHas('category', fn ($q) => $q->where('module', 'cleaning_supplies'))
+            ->whereHas('category', fn ($q) => $q->where('module', 'coffee_water'))
             ->orderBy('name');
 
         if ($request->filled('category_id')) {
@@ -107,46 +63,51 @@ class ConsumableInventoryController extends Controller
         $items = $itemQuery->get();
 
         if ($items->isEmpty()) {
-            return $this->success([]);
+            return $this->success([
+                'week'      => $weekStr,
+                'date_from' => $dateFrom,
+                'date_to'   => $dateTo,
+                'rows'      => [],
+            ]);
         }
 
         $itemIds = $items->pluck('id')->all();
 
-        // Current live stock from consumable_stocks (keyed by consumable_item_id)
+        // Current live stock from consumable_stocks
         $currentStocks = ConsumableStock::whereIn('consumable_item_id', $itemIds)
             ->pluck('quantity', 'consumable_item_id');
 
-        // Issuances STRICTLY AFTER the date
+        // Issuances STRICTLY AFTER the week end
         $issuancesAfter = ConsumableIssuance::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
             ->whereIn('consumable_item_id', $itemIds)
-            ->whereDate('issued_date', '>', $carbon)
+            ->whereDate('issued_date', '>', $weekEnd)
             ->groupBy('consumable_item_id')
             ->pluck('total', 'consumable_item_id');
 
-        // Receivals STRICTLY AFTER the date
+        // Receivals STRICTLY AFTER the week end
         $receivalsAfter = ConsumableReceival::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
             ->whereIn('consumable_item_id', $itemIds)
-            ->whereDate('received_date', '>', $carbon)
+            ->whereDate('received_date', '>', $weekEnd)
             ->groupBy('consumable_item_id')
             ->pluck('total', 'consumable_item_id');
 
-        // Receivals ON the date (add)
-        $receivalsOn = ConsumableReceival::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
+        // Receivals WITHIN the week (add)
+        $receivalsIn = ConsumableReceival::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
             ->whereIn('consumable_item_id', $itemIds)
-            ->whereDate('received_date', $carbon)
+            ->whereBetween('received_date', [$dateFrom, $dateTo])
             ->groupBy('consumable_item_id')
             ->pluck('total', 'consumable_item_id');
 
-        // Issuances ON the date (consumed)
-        $issuancesOn = ConsumableIssuance::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
+        // Issuances WITHIN the week (consumed)
+        $issuancesIn = ConsumableIssuance::select('consumable_item_id', DB::raw('SUM(quantity) as total'))
             ->whereIn('consumable_item_id', $itemIds)
-            ->whereDate('issued_date', $carbon)
+            ->whereBetween('issued_date', [$dateFrom, $dateTo])
             ->groupBy('consumable_item_id')
             ->pluck('total', 'consumable_item_id');
 
-        // Usage: aggregate non-empty usage_history strings from all issuances on the date
+        // Usage: aggregate non-empty usage_history strings from issuances within the week
         $usageRows = ConsumableIssuance::whereIn('consumable_item_id', $itemIds)
-            ->whereDate('issued_date', $carbon)
+            ->whereBetween('issued_date', [$dateFrom, $dateTo])
             ->whereNotNull('usage_history')
             ->where('usage_history', '!=', '')
             ->orderBy('id')
@@ -161,7 +122,6 @@ class ConsumableInventoryController extends Controller
             $usageMap
         );
 
-        // Build result
         $result = [];
         foreach ($items as $item) {
             $id = $item->id;
@@ -169,8 +129,8 @@ class ConsumableInventoryController extends Controller
             $currentQty = (float) ($currentStocks[$id] ?? 0);
             $issAfter   = (float) ($issuancesAfter[$id] ?? 0);
             $recAfter   = (float) ($receivalsAfter[$id] ?? 0);
-            $add        = (float) ($receivalsOn[$id] ?? 0);
-            $consumed   = (float) ($issuancesOn[$id] ?? 0);
+            $add        = (float) ($receivalsIn[$id] ?? 0);
+            $consumed   = (float) ($issuancesIn[$id] ?? 0);
 
             $ending    = $currentQty + $issAfter - $recAfter;
             $beginning = $ending - $add + $consumed;
@@ -190,44 +150,27 @@ class ConsumableInventoryController extends Controller
             ];
         }
 
-        // Sort by category then item name (matches galley)
         usort($result, fn ($a, $b) =>
             [$a['category'], $a['item_name']] <=> [$b['category'], $b['item_name']]
         );
 
-        return $this->success($result);
-    }
-
-    /**
-     * Save or update a remark for a specific item on a given date.
-     * POST /api/consumable-inventory/remark
-     */
-    public function saveRemark(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'item_id' => 'required|exists:consumable_items,id',
-            'date'    => 'required|date',
-            'remarks' => 'nullable|string|max:1000',
+        return $this->success([
+            'week'      => $weekStr,
+            'date_from' => $dateFrom,
+            'date_to'   => $dateTo,
+            'rows'      => $result,
         ]);
-
-        $remark = ConsumableRemark::updateOrCreate(
-            ['consumable_item_id' => $validated['item_id'], 'date' => $validated['date']],
-            ['remarks' => $validated['remarks']],
-        );
-
-        return $this->success($remark, 'Remark saved.');
     }
 
     /**
-     * Download an Excel template pre-filled with all active items (categorised).
-     * The user only needs to fill in Quantity, Date Received, and optionally Notes.
-     *
-     * GET /api/consumable-inventory/template
+     * Download an Excel template pre-filled with all active coffee/water items.
+     * GET /api/coffee-water-inventory/template
      */
     public function template(): StreamedResponse
     {
         $items = ConsumableItem::with(['category'])
             ->where('is_active', true)
+            ->whereHas('category', fn ($q) => $q->where('module', 'coffee_water'))
             ->orderBy('consumable_category_id')
             ->orderBy('name')
             ->get();
@@ -251,7 +194,6 @@ class ConsumableInventoryController extends Controller
             "Date Received will be set automatically to today's date."
         );
 
-        // Lock Category and Item columns (A–B) visually with light fill
         $sheet   = $spreadsheet->getActiveSheet();
         $lastRow = max(count($sampleRows) + 1, 2);
 
@@ -263,7 +205,6 @@ class ConsumableInventoryController extends Controller
             'font' => ['color' => ['rgb' => '555555']],
         ]);
 
-        // Highlight the Quantity column the user must fill
         $sheet->getStyle("C2:C{$lastRow}")->applyFromArray([
             'fill' => [
                 'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
@@ -271,16 +212,12 @@ class ConsumableInventoryController extends Controller
             ],
         ]);
 
-        return $this->streamXlsxDownload($spreadsheet, 'cleaning_supplies_import_template.xlsx');
+        return $this->streamXlsxDownload($spreadsheet, 'coffee_water_import_template.xlsx');
     }
 
     /**
-     * Import receivals from an uploaded Excel file.
-     * POST /api/consumable-inventory/import
-     *
-     * Expects columns: Category, Item, Quantity
-     * Rows with blank Quantity are skipped.
-     * Date Received defaults to today automatically.
+     * Import receivals from an uploaded Excel file (coffee/water items only).
+     * POST /api/coffee-water-inventory/import
      */
     public function import(Request $request): JsonResponse
     {
@@ -292,10 +229,12 @@ class ConsumableInventoryController extends Controller
             return $this->error('No data rows found in the file.', 422);
         }
 
-        // Pre-load all active items keyed by "category:item" (compound) to prevent
-        // name collisions when the same item name exists in multiple categories (e.g. NDB vs NGH).
-        // A plain item-name key is also kept as fallback for rows where Category is blank.
-        $allItems  = ConsumableItem::where('is_active', true)->with(['item', 'category'])->get();
+        // Load only coffee_water items
+        $allItems = ConsumableItem::where('is_active', true)
+            ->with(['item', 'category'])
+            ->whereHas('category', fn ($q) => $q->where('module', 'coffee_water'))
+            ->get();
+
         $itemMapCompound = $allItems->mapWithKeys(
             fn ($i) => [strtolower(trim($i->category?->name ?? '')) . ':' . strtolower(trim($i->name)) => $i]
         );
@@ -311,15 +250,12 @@ class ConsumableInventoryController extends Controller
             $catName  = trim((string) ($row['category'] ?? ''));
             $qtyRaw   = trim((string) ($row['quantity'] ?? ''));
 
-            // Skip rows with no item name or blank quantity (user left them empty)
             if ($itemName === '' || $qtyRaw === '') {
                 $skipped++;
                 continue;
             }
 
-            // Validate item exists — prefer compound "category:item" lookup to avoid
-            // collisions when the same name exists in both NDB and NGH categories.
-            $compoundKey = strtolower($catName) . ':' . strtolower($itemName);
+            $compoundKey    = strtolower($catName) . ':' . strtolower($itemName);
             $consumableItem = $itemMapCompound[$compoundKey]
                 ?? ($catName === '' ? ($itemMapSimple[strtolower($itemName)] ?? null) : null);
 
@@ -328,7 +264,6 @@ class ConsumableInventoryController extends Controller
                 continue;
             }
 
-            // Validate quantity
             if (! is_numeric($qtyRaw) || (float) $qtyRaw <= 0) {
                 $errors[] = ['row' => $rowNum, 'item' => $itemName, 'message' => 'Quantity must be a positive number.'];
                 continue;
@@ -338,7 +273,6 @@ class ConsumableInventoryController extends Controller
 
             try {
                 DB::transaction(function () use ($consumableItem, $qtyRaw, $receivedDate, $request) {
-                    // Create receival record
                     ConsumableReceival::create([
                         'consumable_item_id' => $consumableItem->id,
                         'quantity'           => (float) $qtyRaw,
@@ -347,14 +281,12 @@ class ConsumableInventoryController extends Controller
                         'received_by'        => $request->user()?->id,
                     ]);
 
-                    // Update consumable stock (dedicated table)
                     $stock = ConsumableStock::firstOrCreate(
                         ['consumable_item_id' => $consumableItem->id],
                         ['quantity' => 0]
                     );
                     $stock->increment('quantity', (float) $qtyRaw);
 
-                    // Mirror update to inventory_stocks
                     if ($consumableItem->item_id) {
                         $deptId = $consumableItem->category?->department_id;
                         if ($deptId) {
@@ -366,7 +298,6 @@ class ConsumableInventoryController extends Controller
                         }
                     }
 
-                    // Audit log
                     ConsumableAuditLog::log(
                         'created', 'receival', $consumableItem->id,
                         "Imported receival: {$consumableItem->name} × {$qtyRaw} on {$receivedDate}.",
